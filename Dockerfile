@@ -1,25 +1,64 @@
-# Dockerfile for nestjs-backend-template
-FROM node:20-alpine AS builder
+# =========================
+# 1) Dependencies
+# =========================
+FROM node:22-alpine AS deps
+
+RUN apk upgrade --no-cache \
+  && addgroup -g 1001 -S appgroup \
+  && adduser -S appuser -u 1001 -G appgroup
 
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
+RUN chown appuser:appgroup /app
 
-COPY . .
-RUN npm run build
+COPY --chown=appuser:appgroup package*.json ./
+COPY --chown=appuser:appgroup prisma ./prisma/
+COPY --chown=appuser:appgroup prisma.config.ts ./
 
-# Production stage
-FROM node:20-alpine AS production
+USER appuser
+
+RUN npm ci --fetch-timeout=600000 --fetch-retries=5
+
+
+# =========================
+# 2) Builder
+# =========================
+FROM deps AS builder
+
+COPY --chown=appuser:appgroup . .
+
+RUN npx prisma generate && npm run build
+
+
+# =========================
+# 3) Runner (Production)
+# =========================
+FROM node:22-alpine AS runner
+
+RUN apk upgrade --no-cache \
+  && apk add --no-cache curl \
+  && addgroup -g 1001 -S appgroup \
+  && adduser -S appuser -u 1001 -G appgroup
 
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
 
-COPY --from=builder /app/dist ./dist
+COPY --from=builder --chown=appuser:appgroup /app/package*.json ./
+COPY --from=builder --chown=appuser:appgroup /app/prisma ./prisma
+COPY --from=builder --chown=appuser:appgroup /app/prisma.config.ts ./prisma.config.ts
 
-ENV NODE_ENV=production
-ENV PORT=3000
+RUN npm ci --omit=dev --fetch-timeout=600000 --fetch-retries=5 && npm cache clean --force
+
+COPY --from=builder --chown=appuser:appgroup /app/dist ./dist
+
+RUN mkdir -p logs && chown appuser:appgroup logs
+
+ENV NODE_ENV=production \
+    PORT=3000
+
+USER appuser
 
 EXPOSE 3000
 
-CMD ["node", "dist/src/main"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/src/main"]
