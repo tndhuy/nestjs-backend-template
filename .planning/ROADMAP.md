@@ -101,12 +101,19 @@ Plans:
 
 **Requirements:** REQ-010
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 05-01-PLAN.md — Monorepo setup + CLI scaffold + prompt flow + copy engine + template snapshots
+- [ ] 05-02-PLAN.md — Module toggle implementation (Redis/OTel removal, Kafka codegen) + unit tests
+- [ ] 05-03-PLAN.md — GitHub Packages publishing + CI workflow + smoke test + README
+
 **Deliverables:**
 - `packages/create-app/` CLI package
-- Interactive prompts (service name, optional modules)
+- Interactive prompts (service name, database selection, optional modules)
 - `npx @team/create-app my-service` generates ready-to-run project
 - Published to team registry
 
 ---
 
-*Last updated: 2026-03-30 after 04-03-PLAN.md completion*
+*Last updated: 2026-04-06 after Phase 5 planning*
