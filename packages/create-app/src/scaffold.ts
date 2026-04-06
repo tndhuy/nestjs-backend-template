@@ -1,6 +1,7 @@
-import { cp, readdir, readFile, writeFile, rename, stat } from 'fs/promises';
-import { join, basename, dirname } from 'path';
+import { cp, readdir, readFile, writeFile, rename, rm, stat } from 'fs/promises';
+import { join, basename, dirname, resolve } from 'path';
 import { buildReplacements } from './replacements';
+import { generateKafkaModule } from './kafka-module';
 
 export interface ScaffoldOptions {
   serviceName: string;
@@ -15,7 +16,6 @@ export interface ScaffoldOptions {
  */
 async function isBinaryFile(filePath: string): Promise<boolean> {
   try {
-    const fd = await import('fs');
     const buffer = Buffer.alloc(512);
     const handle = await import('fs/promises').then((m) => m.open(filePath, 'r'));
     try {
@@ -175,6 +175,17 @@ async function patchPackageJson(
       }
     }
 
+    if (!options.modules.includes('otel')) {
+      if (pkg.dependencies) {
+        // Remove all @opentelemetry/* packages
+        for (const dep of Object.keys(pkg.dependencies)) {
+          if (dep.startsWith('@opentelemetry/')) {
+            delete pkg.dependencies[dep];
+          }
+        }
+      }
+    }
+
     await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
   } catch (err) {
     // If package.json doesn't exist or is malformed, skip patching
@@ -183,13 +194,264 @@ async function patchPackageJson(
 }
 
 /**
- * Stub for module removal — implemented in Plan 02.
- * Removes optional module files from the scaffolded project when the user
- * did not select a given module.
+ * Safely check if a path exists.
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export async function removeModule(_destDir: string, _module: string): Promise<void> {
-  // TODO: Plan 02 implements removal of optional modules (redis, otel, kafka)
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await stat(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Safely delete a file if it exists. No-op if file is missing.
+ * Path must be under destDir (security guard against path traversal).
+ */
+async function safeDeleteFile(destDir: string, filePath: string): Promise<void> {
+  const resolved = resolve(filePath);
+  const resolvedDestDir = resolve(destDir);
+  if (!resolved.startsWith(resolvedDestDir + '/') && resolved !== resolvedDestDir) {
+    throw new Error(`Security: path '${filePath}' is outside destDir '${destDir}'`);
+  }
+  try {
+    await rm(resolved, { force: true });
+  } catch {
+    // File doesn't exist — no-op
+  }
+}
+
+/**
+ * Safely delete a directory if it exists. No-op if directory is missing.
+ * Path must be under destDir (security guard against path traversal).
+ */
+async function safeDeleteDir(destDir: string, dirPath: string): Promise<void> {
+  const resolved = resolve(dirPath);
+  const resolvedDestDir = resolve(destDir);
+  if (!resolved.startsWith(resolvedDestDir + '/') && resolved !== resolvedDestDir) {
+    throw new Error(`Security: path '${dirPath}' is outside destDir '${destDir}'`);
+  }
+  try {
+    await rm(resolved, { recursive: true, force: true });
+  } catch {
+    // Directory doesn't exist — no-op
+  }
+}
+
+/**
+ * Remove lines matching a pattern from a file. No-op if file doesn't exist.
+ */
+async function removeMatchingLines(
+  filePath: string,
+  patterns: RegExp[],
+): Promise<void> {
+  if (!(await pathExists(filePath))) return;
+  try {
+    const content = await readFile(filePath, 'utf-8');
+    let updated = content;
+    for (const pattern of patterns) {
+      updated = updated.replace(pattern, '');
+    }
+    // Clean up double blank lines left by removals
+    updated = updated.replace(/\n{3,}/g, '\n\n');
+    if (updated !== content) {
+      await writeFile(filePath, updated, 'utf-8');
+    }
+  } catch {
+    // Skip files that cannot be processed
+  }
+}
+
+/**
+ * Remove Redis module from the scaffolded project.
+ *
+ * - Deletes src/infrastructure/cache/ directory
+ * - Removes ioredis and @nestjs-modules/ioredis from package.json
+ * - Removes CacheModule import and usage from app.module.ts
+ * - Removes REDIS_URL / REDIS_HOST / REDIS_PORT from .env.example
+ */
+export async function removeRedis(destDir: string): Promise<void> {
+  // 1. Delete cache infrastructure directory
+  await safeDeleteDir(destDir, join(destDir, 'src', 'infrastructure', 'cache'));
+
+  // 2. Remove Redis deps from package.json (also handled in patchPackageJson, but do it
+  //    here too so removeRedis is independently correct when called standalone)
+  const pkgPath = join(destDir, 'package.json');
+  if (await pathExists(pkgPath)) {
+    try {
+      const raw = await readFile(pkgPath, 'utf-8');
+      const pkg = JSON.parse(raw);
+      if (pkg.dependencies) {
+        delete pkg.dependencies['ioredis'];
+        delete pkg.dependencies['@nestjs-modules/ioredis'];
+      }
+      await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
+    } catch {
+      // Skip if package.json is malformed
+    }
+  }
+
+  // 3. Remove CacheModule from app.module.ts
+  const appModulePath = join(destDir, 'src', 'app.module.ts');
+  await removeMatchingLines(appModulePath, [
+    // Remove the import statement for CacheModule (from cache/redis.module)
+    /^import\s*\{[^}]*CacheModule[^}]*\}\s*from\s*['"][^'"]*cache[^'"]*['"];\n?/m,
+    // Remove CacheModule entry from the imports array (with optional trailing comma)
+    /^\s*CacheModule,?\n/m,
+  ]);
+
+  // 4. Remove Redis env vars from .env.example
+  const envExamplePath = join(destDir, '.env.example');
+  await removeMatchingLines(envExamplePath, [
+    // Remove REDIS_URL line
+    /^REDIS_URL=.*\n?/m,
+    // Remove REDIS_HOST line
+    /^REDIS_HOST=.*\n?/m,
+    // Remove REDIS_PORT line
+    /^REDIS_PORT=.*\n?/m,
+    // Remove # Redis section header if it becomes orphaned
+    /^# Redis\n(?=\n)/m,
+  ]);
+}
+
+/**
+ * Remove OpenTelemetry from the scaffolded project.
+ *
+ * - Deletes src/instrumentation.ts and src/instrumentation.spec.ts
+ * - Removes @opentelemetry/* packages from package.json
+ * - Removes OTEL_* env vars from .env.example
+ * - Removes the OTel import and sdk.start() call from src/main.ts
+ */
+export async function removeOtel(destDir: string): Promise<void> {
+  // 1. Delete instrumentation files
+  await safeDeleteFile(destDir, join(destDir, 'src', 'instrumentation.ts'));
+  await safeDeleteFile(
+    destDir,
+    join(destDir, 'src', 'instrumentation.spec.ts'),
+  );
+
+  // 2. Remove OTel packages from package.json
+  const pkgPath = join(destDir, 'package.json');
+  if (await pathExists(pkgPath)) {
+    try {
+      const raw = await readFile(pkgPath, 'utf-8');
+      const pkg = JSON.parse(raw);
+      if (pkg.dependencies) {
+        for (const dep of Object.keys(pkg.dependencies)) {
+          if (dep.startsWith('@opentelemetry/')) {
+            delete pkg.dependencies[dep];
+          }
+        }
+      }
+      await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
+    } catch {
+      // Skip if package.json is malformed
+    }
+  }
+
+  // 3. Remove OTEL env vars from .env.example
+  const envExamplePath = join(destDir, '.env.example');
+  await removeMatchingLines(envExamplePath, [
+    /^OTEL_ENABLED=.*\n?/m,
+    /^OTEL_SERVICE_NAME=.*\n?/m,
+    /^OTEL_PROMETHEUS_PORT=.*\n?/m,
+    /^OTEL_EXPORTER_OTLP_ENDPOINT=.*\n?/m,
+    // Remove the # Observability - OpenTelemetry comment block if it becomes orphaned
+    /^# Observability - OpenTelemetry[^\n]*\n(?=\n|$)/m,
+  ]);
+
+  // 4. Remove OTel import and sdk.start() from main.ts
+  const mainTsPath = join(destDir, 'src', 'main.ts');
+  await removeMatchingLines(mainTsPath, [
+    // Remove: import otelSdk from './instrumentation';
+    /^import\s+\w+\s+from\s+['"][^'"]*instrumentation['"];\n?/m,
+    // Remove: otelSdk?.start(); line
+    /^\s*\w+Sdk\?\.start\(\);\n?/m,
+  ]);
+}
+
+/**
+ * Add Kafka module to the scaffolded project.
+ *
+ * - Generates src/kafka/ directory with KafkaModule, KafkaController, and index.ts
+ * - Adds @nestjs/microservices and kafkajs to package.json
+ * - Imports KafkaModule in app.module.ts
+ * - Adds KAFKA_BROKER to .env.example
+ */
+export async function addKafka(
+  destDir: string,
+  serviceName: string,
+): Promise<void> {
+  // 1. Generate Kafka module files
+  await generateKafkaModule(destDir, serviceName);
+
+  // 2. Add Kafka deps to package.json
+  const pkgPath = join(destDir, 'package.json');
+  if (await pathExists(pkgPath)) {
+    try {
+      const raw = await readFile(pkgPath, 'utf-8');
+      const pkg = JSON.parse(raw);
+      if (!pkg.dependencies) pkg.dependencies = {};
+      pkg.dependencies['@nestjs/microservices'] = '^11.1.18';
+      pkg.dependencies['kafkajs'] = '^2.2.4';
+      await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
+    } catch {
+      // Skip if package.json is malformed
+    }
+  }
+
+  // 3. Wire KafkaModule into app.module.ts
+  const appModulePath = join(destDir, 'src', 'app.module.ts');
+  if (await pathExists(appModulePath)) {
+    try {
+      let content = await readFile(appModulePath, 'utf-8');
+
+      // Add KafkaModule import after the last existing import line
+      const kafkaImportLine = `import { KafkaModule } from './kafka/kafka.module';\n`;
+      if (!content.includes(kafkaImportLine)) {
+        // Insert before the @Module decorator
+        content = content.replace(
+          /^(@Module\()/m,
+          `${kafkaImportLine}\n$1`,
+        );
+      }
+
+      // Add KafkaModule to the imports array
+      // Insert after the last module reference before closing bracket of imports array
+      if (!content.includes('KafkaModule,') && !content.includes('KafkaModule\n')) {
+        // Find the imports array and insert KafkaModule before the closing bracket
+        // Pattern: look for the last item before the closing ] of imports: [...]
+        content = content.replace(
+          /(imports:\s*\[[^\]]*?)(\s*\])/s,
+          (match, arrayContent, closing) => {
+            // Check if array has trailing comma on last entry
+            const trimmed = arrayContent.trimEnd();
+            const sep = trimmed.endsWith(',') ? '' : ',';
+            return `${trimmed}${sep}\n    KafkaModule,${closing}`;
+          },
+        );
+      }
+
+      await writeFile(appModulePath, content, 'utf-8');
+    } catch {
+      // Skip if app.module.ts cannot be processed
+    }
+  }
+
+  // 4. Add KAFKA_BROKER to .env.example
+  const envExamplePath = join(destDir, '.env.example');
+  if (await pathExists(envExamplePath)) {
+    try {
+      let content = await readFile(envExamplePath, 'utf-8');
+      if (!content.includes('KAFKA_BROKER')) {
+        content = content.trimEnd() + '\n\n# Kafka\nKAFKA_BROKER=localhost:9092\n';
+        await writeFile(envExamplePath, content, 'utf-8');
+      }
+    } catch {
+      // Skip if .env.example cannot be processed
+    }
+  }
 }
 
 /**
@@ -200,10 +462,11 @@ export async function removeModule(_destDir: string, _module: string): Promise<v
  * 3. Replaces placeholder strings in all text file contents
  * 4. Renames files/dirs that contain placeholder strings in their names
  * 5. Patches package.json with service name and conditional deps
+ * 6. Applies module toggles: removes redis/otel if not selected, adds kafka if selected
  */
 export async function scaffold(options: ScaffoldOptions): Promise<void> {
   const templateDir = join(__dirname, '..', 'templates', options.db);
-  const { destDir, serviceName } = options;
+  const { destDir, serviceName, modules } = options;
 
   // 1. Copy template to destination
   await cp(templateDir, destDir, { recursive: true });
@@ -217,6 +480,19 @@ export async function scaffold(options: ScaffoldOptions): Promise<void> {
   // 4. Rename files/dirs with placeholder names (deepest-first)
   await renamePathsWithPlaceholders(destDir, replacements);
 
-  // 5. Patch package.json
+  // 5. Patch package.json (handles db swap + module dep additions/removals)
   await patchPackageJson(destDir, options);
+
+  // 6. Apply module toggles
+  if (!modules.includes('redis')) {
+    await removeRedis(destDir);
+  }
+
+  if (!modules.includes('otel')) {
+    await removeOtel(destDir);
+  }
+
+  if (modules.includes('kafka')) {
+    await addKafka(destDir, serviceName);
+  }
 }
