@@ -44,3 +44,8 @@ lerna-debug.log*
 
 # TypeScript incremental compilation
 *.tsbuildinfo
+
+# Do not add .npmrc files with auth tokens
+# packages/create-app/.npmrc is committed intentionally (uses ${NODE_AUTH_TOKEN} placeholder, no literal token)
+.npmrc
+!packages/create-app/.npmrc

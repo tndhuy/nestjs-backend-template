@@ -1,0 +1,30 @@
+name: Publish CLI
+on:
+  push:
+    tags: ['create-app@*']
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@team'
+      - name: Install dependencies
+        run: npm ci --workspace=packages/create-app
+      - name: Run tests
+        run: npm test --workspace=packages/create-app
+      - name: Build
+        run: npm run build --workspace=packages/create-app
+      - name: Verify package contents
+        run: cd packages/create-app && npm pack --dry-run
+      - name: Publish
+        run: npm publish --workspace=packages/create-app
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
