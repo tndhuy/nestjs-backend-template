@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A production-ready NestJS backend template built on Full DDD architecture, extracted and generalized from the flash-pick-service codebase. Designed for the team to use as a starter kit when bootstrapping new backend services — and to evolve into a CLI package (`npx @team/create-app`) for one-command project scaffolding.
+A production-ready NestJS 11 backend template built on Full DDD architecture, designed for the team to use as a starter kit when bootstrapping new backend services. Ships with framework-free DDD primitives, URI-versioned REST API, Scalar docs, OpenTelemetry observability, Redis, Prisma/PostgreSQL (or MongoDB), and a CLI package (`npx @team/create-app`) for one-command project scaffolding with database selection and optional module toggles.
 
 ## Core Value
 
@@ -12,30 +12,30 @@ A new backend service should be production-ready in minutes, not days — with D
 
 ### Validated
 
-- ✓ NestJS with TypeScript, modular architecture — existing (flash-pick-service)
-- ✓ Full DDD layers (domain/application/infrastructure/presentation) — existing (flash-pick-service)
-- ✓ Prisma ORM with PostgreSQL — existing (flash-pick-service, user-service)
-- ✓ Redis integration — existing (flash-pick-service)
-- ✓ Pino structured logging — existing (all services)
-- ✓ Global exception filters (HTTP + RPC) — existing (all services)
-- ✓ Scalar/Swagger API docs — existing (flash-pick-service, user-service)
-- ✓ Docker containerization — existing (all services)
-- ✓ OpenTelemetry + Prometheus metrics — existing (flash-pick-service)
+- ✓ NestJS with TypeScript, modular architecture — v1.0
+- ✓ Full DDD layers (domain/application/infrastructure/presentation) — v1.0
+- ✓ Prisma ORM with PostgreSQL — v1.0
+- ✓ Redis integration — v1.0
+- ✓ Pino structured logging — v1.0
+- ✓ Global exception filters (HTTP + RPC) — v1.0
+- ✓ Scalar/Swagger API docs — v1.0
+- ✓ Docker containerization — v1.0
+- ✓ OpenTelemetry + Prometheus metrics — v1.0
+- ✓ Clean generic template scaffold (no business-domain code) — v1.0
+- ✓ Full DDD base classes: Aggregate, Entity, Value Object, Repository interface, Domain Event — v1.0
+- ✓ URI versioning (/api/v1/...) pre-configured — v1.0
+- ✓ Common API standards: response envelope, pagination, error codes — v1.0
+- ✓ Health check endpoints (/health, /health/ready, /health/live) — v1.0
+- ✓ Environment config validation — v1.0
+- ✓ .agent/ directory with Antigravity agent config — v1.0
+- ✓ .claude/ directory with Claude Code skills and GSD — v1.0
+- ✓ MCP configs pre-wired: context7, docker, lark, context-mode — v1.0
+- ✓ Developer onboarding documentation (README, CONTRIBUTING, architecture guide) — v1.0
+- ✓ CLI package: `npx @team/create-app my-service` with database selection and module toggles — v1.0
 
 ### Active
 
-- [ ] Clean generic template scaffold (no business-domain code from flash-pick)
-- [ ] Full DDD base classes: Aggregate, Entity, Value Object, Repository interface, Domain Event
-- [ ] URI versioning (/api/v1/...) pre-configured
-- [ ] Scalar API docs with versioning support
-- [ ] Common API standards: response envelope, pagination, error codes
-- [ ] Health check endpoints (/health, /health/ready, /health/live)
-- [ ] Environment config validation (class-validator on config modules)
-- [ ] .agent/ directory with antigravity agent config (context, skills, MCP)
-- [ ] .claude/ directory with Claude skills: Understand-Anything + GSD
-- [ ] MCP configs pre-wired: context7, docker, lark, context-mode
-- [ ] Developer onboarding documentation (README, CONTRIBUTING, architecture guide)
-- [ ] CLI package: `npx @team/create-app my-service` scaffolding
+(None — v1.0 complete. Define next milestone with `/gsd-new-milestone`)
 
 ### Out of Scope
 
@@ -44,45 +44,54 @@ A new backend service should be production-ready in minutes, not days — with D
 - Multi-tenancy patterns — adds complexity, out of scope for v1 template
 - Frontend (Next.js, React) — backend only
 
+## Current State
+
+**Version shipped:** v1.0 (2026-04-07)
+
+**Packages:**
+- `src/` — NestJS DDD template (root package, uses npm)
+- `packages/create-app/` — `@team/create-app` CLI scaffold package
+
+**Tech stack:** NestJS 11, TypeScript, Prisma (PostgreSQL) or Mongoose (MongoDB), Redis, Pino, OpenTelemetry, Scalar, tsup
+
+**Test coverage:** 34 unit tests (scaffold engine) + 1 smoke test suite (2 e2e scenarios)
+
+**CLI:** Published to GitHub Packages registry as `@team/create-app`
+
 ## Context
 
-**Source codebase:** `flash-pick-service` in this workspace is the reference implementation. It already has the patterns we want — the task is extraction, generalization, and documentation.
+**Agent ecosystem:** Both Claude Code (`.claude/`) and Antigravity (`.agent/`) configured with pre-wired MCP servers, context files, and skills.
 
-**Existing patterns to preserve:**
-- Port/Adapter pattern for dependency inversion (ports as interfaces injected via DI)
-- Value Objects: `StringValueObject`, `NumberValueObject`, `IdValueObject` in `src/shared/valueobjects/`
-- Aggregate Root with domain events: `src/shared/aggregate-root.ts`
-- Global validation pipe + class-validator DTOs
-- Rate limiting via ThrottlerModule
-- JWT auth pattern (from user-service)
+**Template variants:** Two full template snapshots bundled in CLI: postgres (Prisma + PostgreSQL) and mongo (Mongoose + MongoDB).
 
-**Agent ecosystem:** Team uses two AI coding assistants — Claude Code (`.claude/`) and Antigravity (`.agent/`). Both need project-scoped configs with context files, skills, and MCP server configs. Template should ship with both pre-configured.
-
-**End goal:** This template becomes the team's standard. Every new backend service starts from here. Eventually wrap as CLI package so `npx @team/create-app` generates a ready-to-run project.
+**Module toggles:** Redis, OTel can be removed; Kafka module can be generated — all wired into interactive CLI prompts.
 
 ## Constraints
 
-- **Tech Stack**: NestJS + TypeScript + Prisma + PostgreSQL + Redis — locked, this is the team standard
+- **Tech Stack**: NestJS + TypeScript + Prisma/Mongoose — locked, this is the team standard
 - **DDD Depth**: Full DDD (Aggregate, Entity, Value Object, Repository, Domain Event) — not negotiable
-- **Naming**: Follow existing conventions from flash-pick-service (camelCase files, kebab-case directories)
-- **Node**: pnpm package manager (consistent with existing workspace)
-- **Agent Config**: Must support both `.agent/` (antigravity) and `.claude/` (Claude Code) simultaneously
+- **Naming**: kebab-case directories, camelCase files
+- **Package manager**: npm (root workspace with packages/*)
+- **Agent Config**: Must support both `.agent/` (Antigravity) and `.claude/` (Claude Code) simultaneously
 
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Based on flash-pick-service (not user-service) | flash-pick has more complete DDD patterns and infrastructure | — Pending |
-| URI versioning (/api/v1/) over header versioning | Easier to test, more visible in logs, team preference | — Pending |
-| Template-first, CLI-second | Ship usable template fast; CLI wrapper added in later phase | — Pending |
-| Scalar over plain Swagger UI | Scalar is already used in existing services, better DX | — Pending |
-| pnpm workspace | Consistent with all existing services in this repo | — Pending |
+| Based on flash-pick-service (not user-service) | flash-pick has more complete DDD patterns and infrastructure | ✓ Good — clean extraction worked |
+| URI versioning (/api/v1/) over header versioning | Easier to test, more visible in logs, team preference | ✓ Good — confirmed team preference |
+| Template-first, CLI-second | Ship usable template fast; CLI wrapper added in later phase | ✓ Good — shipped CLI in Phase 5 |
+| Scalar over plain Swagger UI | Scalar is already used in existing services, better DX | ✓ Good — consistent with team tools |
+| npm workspace (not pnpm) | Consistent with root package.json | ✓ Good — no workspace conflicts |
+| Two full template snapshots (postgres + mongo) over single base + patch | Simpler scaffold logic, deterministic output | ✓ Good — offline-capable, no git clone at runtime |
+| CJS output for tsup (not ESM) | reflect-metadata compatibility in generated projects | ✓ Good — required for NestJS decorators |
+| Bundled template snapshots (not runtime git clone) | Offline-capable, deterministic, no auth needed | ✓ Good — simpler for team adoption |
+| @clack/prompts for CLI UX | Consistent, polished terminal UX with cancel handling | ✓ Good — isCancel() guard pattern proven |
+| GitHub Packages registry for @team scope | Private team registry, automatic GITHUB_TOKEN auth in CI | ✓ Good — zero external service dependency |
 
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
 
-**After each phase:** Move completed requirements to Validated, add new decisions to Key Decisions table.
-
 ---
-*Last updated: 2026-03-23 after initialization*
+*Last updated: 2026-04-07 after v1.0 milestone*
