@@ -1,4 +1,4 @@
-import { AggregateRoot } from '../../shared/base/aggregate-root';
+import { AggregateRoot } from '../../../shared/base/aggregate-root';
 import { ItemName } from './item-name.value-object';
 
 export class Item extends AggregateRoot<string> {

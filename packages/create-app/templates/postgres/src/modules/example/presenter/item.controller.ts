@@ -7,7 +7,7 @@ import { CreateItemCommand } from '../application/commands/create-item.command';
 import { DeleteItemCommand } from '../application/commands/delete-item.command';
 import { GetItemQuery } from '../application/queries/get-item.query';
 import { ListItemsQuery } from '../application/queries/list-items.query';
-import { PaginationDto } from '../../shared';
+import { PaginationDto } from '../../../shared';
 
 @ApiTags('example')
 @Controller('items')

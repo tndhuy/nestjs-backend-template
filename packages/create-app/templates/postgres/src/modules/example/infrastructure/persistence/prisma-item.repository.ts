@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { InjectPrisma } from '../../../infrastructure/database/inject-prisma.decorator';
-import { PrismaService } from '../../../infrastructure/database/prisma.service';
+import { InjectPrisma } from '../../../../infrastructure/database/inject-prisma.decorator';
+import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import { IItemRepository } from '../../domain/item.repository.interface';
 import { Item } from '../../domain/item.entity';
 import { ItemName } from '../../domain/item-name.value-object';

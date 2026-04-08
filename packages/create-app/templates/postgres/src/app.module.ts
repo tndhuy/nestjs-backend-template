@@ -6,7 +6,7 @@ import { AppConfigModule } from './infrastructure/config/config.module';
 import { DatabaseModule } from './infrastructure/database/prisma.module';
 import { CacheModule } from './infrastructure/cache/redis.module';
 import { HealthModule } from './infrastructure/health/health.module';
-import { ExampleModule } from './example/example.module';
+import { ExampleModule } from './modules/example/example.module';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 
 @Module({

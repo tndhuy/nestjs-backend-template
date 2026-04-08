@@ -25,11 +25,11 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 
 // src/cli.ts
 var import_prompts = require("@clack/prompts");
-var import_path2 = require("path");
+var import_path3 = require("path");
 
 // src/scaffold.ts
-var import_promises = require("fs/promises");
-var import_path = require("path");
+var import_promises2 = require("fs/promises");
+var import_path2 = require("path");
 
 // src/replacements.ts
 function toPascalCase(kebab) {
@@ -63,10 +63,67 @@ function validateServiceName(name) {
   return void 0;
 }
 
+// src/kafka-module.ts
+var import_promises = require("fs/promises");
+var import_path = require("path");
+async function generateKafkaModule(destDir, serviceName) {
+  const kafkaDir = (0, import_path.join)(destDir, "src", "kafka");
+  await (0, import_promises.mkdir)(kafkaDir, { recursive: true });
+  const moduleContent = `import { Module } from '@nestjs/common';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ConfigService } from '@nestjs/config';
+import { KafkaController } from './kafka.controller';
+
+@Module({
+  imports: [
+    ClientsModule.registerAsync([{
+      name: 'KAFKA_SERVICE',
+      useFactory: (configService: ConfigService) => ({
+        transport: Transport.KAFKA,
+        options: {
+          client: {
+            brokers: [configService.get<string>('KAFKA_BROKER', 'localhost:9092')],
+          },
+          consumer: {
+            groupId: \`${serviceName}-consumer-group\`,
+          },
+        },
+      }),
+      inject: [ConfigService],
+    }]),
+  ],
+  controllers: [KafkaController],
+  exports: [ClientsModule],
+})
+export class KafkaModule {}
+`;
+  await (0, import_promises.writeFile)((0, import_path.join)(kafkaDir, "kafka.module.ts"), moduleContent, "utf-8");
+  const controllerContent = `import { Controller } from '@nestjs/common';
+import { MessagePattern, Payload } from '@nestjs/microservices';
+
+@Controller()
+export class KafkaController {
+  @MessagePattern('example-topic')
+  handleMessage(@Payload() message: unknown) {
+    // TODO: Implement your Kafka message handler
+    return message;
+  }
+}
+`;
+  await (0, import_promises.writeFile)(
+    (0, import_path.join)(kafkaDir, "kafka.controller.ts"),
+    controllerContent,
+    "utf-8"
+  );
+  const barrelContent = `export { KafkaModule } from './kafka.module';
+export { KafkaController } from './kafka.controller';
+`;
+  await (0, import_promises.writeFile)((0, import_path.join)(kafkaDir, "index.ts"), barrelContent, "utf-8");
+}
+
 // src/scaffold.ts
 async function isBinaryFile(filePath) {
   try {
-    const fd = await import("fs");
     const buffer = Buffer.alloc(512);
     const handle = await import("fs/promises").then((m) => m.open(filePath, "r"));
     try {
@@ -88,9 +145,9 @@ async function isBinaryFile(filePath) {
 }
 async function collectPaths(dir) {
   const results = [];
-  const entries = await (0, import_promises.readdir)(dir, { withFileTypes: true });
+  const entries = await (0, import_promises2.readdir)(dir, { withFileTypes: true });
   for (const entry of entries) {
-    const fullPath = (0, import_path.join)(dir, entry.name);
+    const fullPath = (0, import_path2.join)(dir, entry.name);
     if (entry.isDirectory()) {
       const nested = await collectPaths(fullPath);
       results.push(...nested);
@@ -100,16 +157,16 @@ async function collectPaths(dir) {
   return results;
 }
 async function replaceFileContents(dir, replacements) {
-  const entries = await (0, import_promises.readdir)(dir, { withFileTypes: true });
+  const entries = await (0, import_promises2.readdir)(dir, { withFileTypes: true });
   for (const entry of entries) {
-    const fullPath = (0, import_path.join)(dir, entry.name);
+    const fullPath = (0, import_path2.join)(dir, entry.name);
     if (entry.isDirectory()) {
       await replaceFileContents(fullPath, replacements);
     } else {
       const binary = await isBinaryFile(fullPath);
       if (binary) continue;
       try {
-        let content = await (0, import_promises.readFile)(fullPath, "utf-8");
+        let content = await (0, import_promises2.readFile)(fullPath, "utf-8");
         let modified = false;
         for (const [from, to] of replacements) {
           if (content.includes(from)) {
@@ -118,7 +175,7 @@ async function replaceFileContents(dir, replacements) {
           }
         }
         if (modified) {
-          await (0, import_promises.writeFile)(fullPath, content, "utf-8");
+          await (0, import_promises2.writeFile)(fullPath, content, "utf-8");
         }
       } catch {
       }
@@ -133,8 +190,8 @@ async function renamePathsWithPlaceholders(dir, replacements) {
     return depthB - depthA;
   });
   for (const oldPath of allPaths) {
-    const parent = (0, import_path.dirname)(oldPath);
-    let newName = (0, import_path.basename)(oldPath);
+    const parent = (0, import_path2.dirname)(oldPath);
+    let newName = (0, import_path2.basename)(oldPath);
     let changed = false;
     for (const [from, to] of replacements) {
       if (newName.includes(from)) {
@@ -143,18 +200,18 @@ async function renamePathsWithPlaceholders(dir, replacements) {
       }
     }
     if (changed) {
-      const newPath = (0, import_path.join)(parent, newName);
+      const newPath = (0, import_path2.join)(parent, newName);
       try {
-        await (0, import_promises.rename)(oldPath, newPath);
+        await (0, import_promises2.rename)(oldPath, newPath);
       } catch {
       }
     }
   }
 }
 async function patchPackageJson(destDir, options) {
-  const pkgPath = (0, import_path.join)(destDir, "package.json");
+  const pkgPath = (0, import_path2.join)(destDir, "package.json");
   try {
-    const raw = await (0, import_promises.readFile)(pkgPath, "utf-8");
+    const raw = await (0, import_promises2.readFile)(pkgPath, "utf-8");
     const pkg = JSON.parse(raw);
     pkg.name = options.serviceName;
     if (options.db === "mongo") {
@@ -181,19 +238,209 @@ async function patchPackageJson(destDir, options) {
         delete pkg.dependencies["@nestjs-modules/ioredis"];
       }
     }
-    await (0, import_promises.writeFile)(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf-8");
+    if (!options.modules.includes("otel")) {
+      if (pkg.dependencies) {
+        for (const dep of Object.keys(pkg.dependencies)) {
+          if (dep.startsWith("@opentelemetry/")) {
+            delete pkg.dependencies[dep];
+          }
+        }
+      }
+    }
+    await (0, import_promises2.writeFile)(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf-8");
   } catch (err) {
     console.warn("Warning: Could not patch package.json:", err);
   }
 }
+async function pathExists(p) {
+  try {
+    await (0, import_promises2.stat)(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+async function safeDeleteFile(destDir, filePath) {
+  const resolved = (0, import_path2.resolve)(filePath);
+  const resolvedDestDir = (0, import_path2.resolve)(destDir);
+  if (!resolved.startsWith(resolvedDestDir + "/") && resolved !== resolvedDestDir) {
+    throw new Error(`Security: path '${filePath}' is outside destDir '${destDir}'`);
+  }
+  try {
+    await (0, import_promises2.rm)(resolved, { force: true });
+  } catch {
+  }
+}
+async function safeDeleteDir(destDir, dirPath) {
+  const resolved = (0, import_path2.resolve)(dirPath);
+  const resolvedDestDir = (0, import_path2.resolve)(destDir);
+  if (!resolved.startsWith(resolvedDestDir + "/") && resolved !== resolvedDestDir) {
+    throw new Error(`Security: path '${dirPath}' is outside destDir '${destDir}'`);
+  }
+  try {
+    await (0, import_promises2.rm)(resolved, { recursive: true, force: true });
+  } catch {
+  }
+}
+async function removeMatchingLines(filePath, patterns) {
+  if (!await pathExists(filePath)) return;
+  try {
+    const content = await (0, import_promises2.readFile)(filePath, "utf-8");
+    let updated = content;
+    for (const pattern of patterns) {
+      updated = updated.replace(pattern, "");
+    }
+    updated = updated.replace(/\n{3,}/g, "\n\n");
+    if (updated !== content) {
+      await (0, import_promises2.writeFile)(filePath, updated, "utf-8");
+    }
+  } catch {
+  }
+}
+async function removeRedis(destDir) {
+  await safeDeleteDir(destDir, (0, import_path2.join)(destDir, "src", "infrastructure", "cache"));
+  const pkgPath = (0, import_path2.join)(destDir, "package.json");
+  if (await pathExists(pkgPath)) {
+    try {
+      const raw = await (0, import_promises2.readFile)(pkgPath, "utf-8");
+      const pkg = JSON.parse(raw);
+      if (pkg.dependencies) {
+        delete pkg.dependencies["ioredis"];
+        delete pkg.dependencies["@nestjs-modules/ioredis"];
+      }
+      await (0, import_promises2.writeFile)(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf-8");
+    } catch {
+    }
+  }
+  const appModulePath = (0, import_path2.join)(destDir, "src", "app.module.ts");
+  await removeMatchingLines(appModulePath, [
+    // Remove the import statement for CacheModule (from cache/redis.module)
+    /^import\s*\{[^}]*CacheModule[^}]*\}\s*from\s*['"][^'"]*cache[^'"]*['"];\n?/m,
+    // Remove CacheModule entry from the imports array (with optional trailing comma)
+    /^\s*CacheModule,?\n/m
+  ]);
+  const envExamplePath = (0, import_path2.join)(destDir, ".env.example");
+  await removeMatchingLines(envExamplePath, [
+    // Remove REDIS_URL line
+    /^REDIS_URL=.*\n?/m,
+    // Remove REDIS_HOST line
+    /^REDIS_HOST=.*\n?/m,
+    // Remove REDIS_PORT line
+    /^REDIS_PORT=.*\n?/m,
+    // Remove # Redis section header if it becomes orphaned
+    /^# Redis\n(?=\n)/m
+  ]);
+}
+async function removeOtel(destDir) {
+  await safeDeleteFile(destDir, (0, import_path2.join)(destDir, "src", "instrumentation.ts"));
+  await safeDeleteFile(
+    destDir,
+    (0, import_path2.join)(destDir, "src", "instrumentation.spec.ts")
+  );
+  const pkgPath = (0, import_path2.join)(destDir, "package.json");
+  if (await pathExists(pkgPath)) {
+    try {
+      const raw = await (0, import_promises2.readFile)(pkgPath, "utf-8");
+      const pkg = JSON.parse(raw);
+      if (pkg.dependencies) {
+        for (const dep of Object.keys(pkg.dependencies)) {
+          if (dep.startsWith("@opentelemetry/")) {
+            delete pkg.dependencies[dep];
+          }
+        }
+      }
+      await (0, import_promises2.writeFile)(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf-8");
+    } catch {
+    }
+  }
+  const envExamplePath = (0, import_path2.join)(destDir, ".env.example");
+  await removeMatchingLines(envExamplePath, [
+    /^OTEL_ENABLED=.*\n?/m,
+    /^OTEL_SERVICE_NAME=.*\n?/m,
+    /^OTEL_PROMETHEUS_PORT=.*\n?/m,
+    /^OTEL_EXPORTER_OTLP_ENDPOINT=.*\n?/m,
+    // Remove the # Observability - OpenTelemetry comment block if it becomes orphaned
+    /^# Observability - OpenTelemetry[^\n]*\n(?=\n|$)/m
+  ]);
+  const mainTsPath = (0, import_path2.join)(destDir, "src", "main.ts");
+  await removeMatchingLines(mainTsPath, [
+    // Remove: import otelSdk from './instrumentation';
+    /^import\s+\w+\s+from\s+['"][^'"]*instrumentation['"];\n?/m,
+    // Remove: otelSdk?.start(); line
+    /^\s*\w+Sdk\?\.start\(\);\n?/m
+  ]);
+}
+async function addKafka(destDir, serviceName) {
+  await generateKafkaModule(destDir, serviceName);
+  const pkgPath = (0, import_path2.join)(destDir, "package.json");
+  if (await pathExists(pkgPath)) {
+    try {
+      const raw = await (0, import_promises2.readFile)(pkgPath, "utf-8");
+      const pkg = JSON.parse(raw);
+      if (!pkg.dependencies) pkg.dependencies = {};
+      pkg.dependencies["@nestjs/microservices"] = "^11.1.18";
+      pkg.dependencies["kafkajs"] = "^2.2.4";
+      await (0, import_promises2.writeFile)(pkgPath, JSON.stringify(pkg, null, 2) + "\n", "utf-8");
+    } catch {
+    }
+  }
+  const appModulePath = (0, import_path2.join)(destDir, "src", "app.module.ts");
+  if (await pathExists(appModulePath)) {
+    try {
+      let content = await (0, import_promises2.readFile)(appModulePath, "utf-8");
+      const kafkaImportLine = `import { KafkaModule } from './kafka/kafka.module';
+`;
+      if (!content.includes(kafkaImportLine)) {
+        content = content.replace(
+          /^(@Module\()/m,
+          `${kafkaImportLine}
+$1`
+        );
+      }
+      if (!content.includes("KafkaModule,") && !content.includes("KafkaModule\n")) {
+        content = content.replace(
+          /(imports:\s*\[[^\]]*?)(\s*\])/s,
+          (match, arrayContent, closing) => {
+            const trimmed = arrayContent.trimEnd();
+            const sep = trimmed.endsWith(",") ? "" : ",";
+            return `${trimmed}${sep}
+    KafkaModule,${closing}`;
+          }
+        );
+      }
+      await (0, import_promises2.writeFile)(appModulePath, content, "utf-8");
+    } catch {
+    }
+  }
+  const envExamplePath = (0, import_path2.join)(destDir, ".env.example");
+  if (await pathExists(envExamplePath)) {
+    try {
+      let content = await (0, import_promises2.readFile)(envExamplePath, "utf-8");
+      if (!content.includes("KAFKA_BROKER")) {
+        content = content.trimEnd() + "\n\n# Kafka\nKAFKA_BROKER=localhost:9092\n";
+        await (0, import_promises2.writeFile)(envExamplePath, content, "utf-8");
+      }
+    } catch {
+    }
+  }
+}
 async function scaffold(options) {
-  const templateDir = (0, import_path.join)(__dirname, "..", "templates", options.db);
-  const { destDir, serviceName } = options;
-  await (0, import_promises.cp)(templateDir, destDir, { recursive: true });
+  const templateDir = (0, import_path2.join)(__dirname, "..", "templates", options.db);
+  const { destDir, serviceName, modules } = options;
+  await (0, import_promises2.cp)(templateDir, destDir, { recursive: true });
   const replacements = buildReplacements(serviceName);
   await replaceFileContents(destDir, replacements);
   await renamePathsWithPlaceholders(destDir, replacements);
   await patchPackageJson(destDir, options);
+  if (!modules.includes("redis")) {
+    await removeRedis(destDir);
+  }
+  if (!modules.includes("otel")) {
+    await removeOtel(destDir);
+  }
+  if (modules.includes("kafka")) {
+    await addKafka(destDir, serviceName);
+  }
 }
 
 // src/cli.ts
@@ -249,7 +496,7 @@ async function main() {
     (0, import_prompts.cancel)("Scaffolding cancelled.");
     process.exit(0);
   }
-  const destDir = (0, import_path2.join)(process.cwd(), serviceName);
+  const destDir = (0, import_path3.join)(process.cwd(), serviceName);
   const s = (0, import_prompts.spinner)();
   s.start("Scaffolding project...");
   try {
