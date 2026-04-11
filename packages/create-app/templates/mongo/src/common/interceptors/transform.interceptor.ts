@@ -2,23 +2,24 @@ import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nes
 import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-
-export const RAW_RESPONSE_KEY = 'raw_response';
+import { PUBLIC_API_KEY } from '../decorators/public-api.decorator';
 
 @Injectable()
 export class TransformInterceptor<T> implements NestInterceptor<T, unknown> {
   constructor(private readonly reflector: Reflector) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const isRaw = this.reflector.getAllAndOverride<boolean>(RAW_RESPONSE_KEY, [
+    const isPublic = this.reflector.getAllAndOverride<boolean>(PUBLIC_API_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
 
-    if (isRaw) {
+    // Internal first: If not explicitly marked as Public API, return RAW data
+    if (!isPublic) {
       return next.handle();
     }
 
+    // Public API: Wrap response in a standardized success object
     return next.handle().pipe(map((data) => ({ success: true, data })));
   }
 }

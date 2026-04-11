@@ -11,6 +11,7 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { TimeoutInterceptor } from './common/interceptors/timeout.interceptor';
 import { validationOptions } from './shared/validation-options';
+import { LoggerService } from './shared/logger/logger.service';
 
 async function bootstrap() {
   otelSdk?.start();
@@ -34,8 +35,9 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe(validationOptions));
 
   const reflector = app.get(Reflector);
+  const loggerService = app.get(LoggerService);
 
-  app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalFilters(new HttpExceptionFilter(loggerService));
 
   app.useGlobalInterceptors(
     new TransformInterceptor(reflector),
@@ -80,7 +82,18 @@ async function bootstrap() {
   );
 
   const port = parseInt(process.env.PORT ?? '3000', 10);
-  await app.listen(port);
+  const httpServer = await app.listen(port);
+
+  process.on('SIGTERM', () => {
+    loggerService.log('SIGTERM signal received: closing HTTP server');
+    setTimeout(() => {
+      void otelSdk?.shutdown().catch(() => undefined);
+      httpServer.close(() => {
+        loggerService.log('HTTP server closed');
+        process.exit(0);
+      });
+    }, 15000);
+  });
 
   const logger = app.get(Logger);
   logger.log(`Application running on http://localhost:${port}`);

@@ -30,14 +30,23 @@ function guardCancel<T>(value: T | symbol): T {
 async function main(): Promise<void> {
   intro('create-app -- NestJS DDD scaffolder');
 
-  // 1. Collect service name
-  const serviceName = guardCancel(
-    await text({
-      message: 'Service name (kebab-case)',
-      placeholder: 'my-service',
-      validate: (v) => validateServiceName(v),
-    }),
-  );
+  // 0. Parse positional argument if present
+  const argName = process.argv[2];
+  let serviceName: string;
+
+  if (argName && !validateServiceName(argName)) {
+    serviceName = argName;
+    console.log(`  Service name : ${serviceName} (from arguments)`);
+  } else {
+    // 1. Collect service name
+    serviceName = guardCancel(
+      await text({
+        message: 'Service name (kebab-case)',
+        placeholder: 'my-service',
+        validate: (v) => validateServiceName(v),
+      }),
+    );
+  }
 
   // 2. Database selection
   const db = guardCancel(
