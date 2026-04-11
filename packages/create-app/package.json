@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": false,
   "bin": {
-    "create-app": "./dist/cli.js"
+    "create-app": "dist/cli.js"
   },
   "files": [
     "dist",
