@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { PublicApi } from '../../../common/decorators/public-api.decorator';
 import { CreateItemDto } from '../application/dtos/create-item.dto';
 import { ItemResponseDto } from '../application/dtos/item.response.dto';
 import { CreateItemCommand } from '../application/commands/create-item.command';
@@ -34,6 +35,7 @@ export class ItemController {
     return this.commandBus.execute(new DeleteItemCommand(id));
   }
 
+  @PublicApi()
   @Get(':id')
   @ApiOperation({ summary: 'Get an item by ID' })
   @ApiParam({ name: 'id', description: 'Item UUID' })
@@ -43,6 +45,7 @@ export class ItemController {
     return this.queryBus.execute(new GetItemQuery(id));
   }
 
+  @PublicApi()
   @Get()
   @ApiOperation({ summary: 'List all items with pagination' })
   @ApiResponse({ status: 200, description: 'List of items', type: [ItemResponseDto] })
