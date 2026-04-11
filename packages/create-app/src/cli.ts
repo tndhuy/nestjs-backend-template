@@ -10,8 +10,11 @@ import {
   isCancel,
   cancel,
   note,
+  confirm,
 } from '@clack/prompts';
 import { join } from 'path';
+import { stat, rm } from 'fs/promises';
+import { execa } from 'execa';
 import { scaffold } from './scaffold';
 import { validateServiceName } from './replacements';
 
@@ -27,8 +30,24 @@ function guardCancel<T>(value: T | symbol): T {
   return value as T;
 }
 
+/**
+ * Check if directory exists
+ */
+async function directoryExists(p: string): Promise<boolean> {
+  try {
+    await stat(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function main(): Promise<void> {
-  intro('create-app -- NestJS DDD scaffolder');
+  const args = process.argv.slice(2);
+  const dryRun = args.includes('--dry-run');
+  const positionalName = args.find(a => !a.startsWith('--'));
+
+  intro('create-app -- NestJS DDD scaffolder' + (dryRun ? ' [DRY RUN]' : ''));
 
   const config = {
     serviceName: '',
@@ -36,10 +55,8 @@ async function main(): Promise<void> {
     modules: [] as string[],
   };
 
-  // 0. Parse positional argument if present
-  const argName = process.argv[2];
-  if (argName && !validateServiceName(argName)) {
-    config.serviceName = argName;
+  if (positionalName && !validateServiceName(positionalName)) {
+    config.serviceName = positionalName;
   }
 
   let step = config.serviceName ? 1 : 0;
@@ -48,7 +65,6 @@ async function main(): Promise<void> {
   while (step < totalSteps) {
     switch (step) {
       case 0: {
-        // Step 0: Service Name
         const res = guardCancel(
           await text({
             message: 'Service name (kebab-case)',
@@ -62,7 +78,6 @@ async function main(): Promise<void> {
       }
 
       case 1: {
-        // Step 1: Database selection
         const res = guardCancel(
           await select<'postgres' | 'mongo' | '_back'>({
             message: 'Select database',
@@ -84,7 +99,6 @@ async function main(): Promise<void> {
       }
 
       case 2: {
-        // Step 2: Optional module toggles
         const res = guardCancel(
           await multiselect<string>({
             message: 'Optional modules (space to toggle, enter to confirm)',
@@ -108,7 +122,6 @@ async function main(): Promise<void> {
       }
 
       case 3: {
-        // Step 3: Confirm summary
         const selectedModules = config.modules.length > 0
           ? config.modules.join(', ')
           : 'none';
@@ -132,7 +145,38 @@ async function main(): Promise<void> {
         );
 
         if (res === 'confirm') {
-          step++;
+          // Check if directory exists before proceeding
+          const destDir = join(process.cwd(), config.serviceName);
+          if (await directoryExists(destDir) && !dryRun) {
+            const overwrite = guardCancel(
+              await select<'overwrite' | 'cancel' | 'back'>({
+                message: `Directory "${config.serviceName}" already exists.`,
+                options: [
+                  { value: 'overwrite', label: 'Overwrite', hint: 'danger: deletes existing directory' },
+                  { value: 'back', label: 'Change service name', hint: 'go back to step 1' },
+                  { value: 'cancel', label: 'Exit', hint: 'cancel' },
+                ],
+              }),
+            );
+
+            if (overwrite === 'overwrite') {
+              const confirmDelete = guardCancel(await confirm({ message: 'Are you absolutely sure?', initialValue: false }));
+              if (confirmDelete) {
+                const s = spinner();
+                s.start('Cleaning up existing directory...');
+                await rm(destDir, { recursive: true, force: true });
+                s.stop('Directory cleaned.');
+                step++;
+              }
+            } else if (overwrite === 'back') {
+              step = 0;
+            } else {
+              cancel('Operation cancelled.');
+              process.exit(0);
+            }
+          } else {
+            step++;
+          }
         } else if (res === 'back') {
           step--;
         } else {
@@ -155,6 +199,7 @@ async function main(): Promise<void> {
       db: config.db,
       modules: config.modules,
       destDir,
+      dryRun,
     });
     s.stop('Project scaffolded!');
   } catch (err) {
@@ -162,9 +207,48 @@ async function main(): Promise<void> {
     throw err;
   }
 
+  if (!dryRun) {
+    // Post-scaffold: Git Init
+    const initGit = guardCancel(await confirm({ message: 'Initialize git repository?', initialValue: true }));
+    if (initGit) {
+      const gs = spinner();
+      gs.start('Initializing git...');
+      try {
+        await execa('git', ['init'], { cwd: destDir });
+        await execa('git', ['add', '.'], { cwd: destDir });
+        await execa('git', ['commit', '-m', 'chore: initial commit from template'], { cwd: destDir });
+        gs.stop('Git initialized with initial commit.');
+      } catch (err) {
+        gs.stop('Git initialization failed (check if git is installed).');
+      }
+    }
+
+    // Post-scaffold: Install Dependencies
+    const installDeps = guardCancel(await confirm({ message: 'Install dependencies now?', initialValue: true }));
+    if (installDeps) {
+      const pkgManager = guardCancel(await select({
+        message: 'Select package manager',
+        options: [
+          { value: 'pnpm', label: 'pnpm', hint: 'recommended' },
+          { value: 'npm', label: 'npm' },
+          { value: 'yarn', label: 'yarn' },
+        ],
+      })) as string;
+
+      const is = spinner();
+      is.start(`Installing dependencies using ${pkgManager}...`);
+      try {
+        await execa(pkgManager, ['install'], { cwd: destDir, stdio: 'inherit' });
+        is.stop('Dependencies installed successfully.');
+      } catch (err) {
+        is.stop('Dependency installation failed.');
+      }
+    }
+  }
+
   // Next steps
   outro(
-    `Next steps:\n\n  cd ${config.serviceName}\n  npm install\n  cp .env.example .env\n  npm run start:dev\n`,
+    `Next steps:\n\n  cd ${config.serviceName}\n${dryRun ? '' : '  npm run start:dev\n'}`
   );
 }
 

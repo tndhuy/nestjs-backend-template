@@ -8,6 +8,7 @@ export interface ScaffoldOptions {
   db: 'postgres' | 'mongo';
   modules: string[]; // 'redis' | 'otel' | 'kafka'
   destDir: string;
+  dryRun?: boolean;
 }
 
 /**
@@ -472,7 +473,14 @@ export async function addKafka(
  */
 export async function scaffold(options: ScaffoldOptions): Promise<void> {
   const templateDir = join(__dirname, '..', 'templates', options.db);
-  const { destDir, serviceName, modules } = options;
+  const { destDir, serviceName, modules, dryRun } = options;
+
+  if (dryRun) {
+    console.log(`\n  [Dry Run] Would copy template from ${options.db} to ${destDir}`);
+    console.log(`  [Dry Run] Would replace placeholders for: ${serviceName}`);
+    console.log(`  [Dry Run] Would apply modules: ${modules.join(', ') || 'none'}\n`);
+    return;
+  }
 
   // 1. Copy template to destination
   await cp(templateDir, destDir, { recursive: true });
