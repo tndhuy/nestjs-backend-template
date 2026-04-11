@@ -94,7 +94,10 @@ async function replaceFileContents(
             if (flag) {
               return content.replaceAll(startTag, '').replaceAll(endTag, '');
             } else {
-              const regex = new RegExp(`${startTag}[\\s\\S]*?${endTag}`, 'g');
+              // Escape braces for Regex: {{ becomes \{\{
+              const escapedStart = startTag.replace(/\{/g, '\\{').replace(/\}/g, '\\}');
+              const escapedEnd = endTag.replace(/\{/g, '\\{').replace(/\}/g, '\\}');
+              const regex = new RegExp(`${escapedStart}[\\s\\S]*?${escapedEnd}`, 'g');
               return content.replace(regex, '');
             }
           }
