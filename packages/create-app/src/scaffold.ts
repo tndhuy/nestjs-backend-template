@@ -149,20 +149,20 @@ async function patchPackageJson(
     // but package.json may still have the original if the name field wasn't replaced)
     pkg.name = options.serviceName;
 
-    // Default to prisma version 6 for compatibility
-    const PRISMA_VERSION = '^6.0.0';
+    const PRISMA_LATEST = '^7.5.0';
+    const PRISMA_MONGO_COMPAT = '^6.0.0';
 
     if (options.db === 'mongo') {
       if (options.orm === 'prisma') {
-        // Use Prisma with MongoDB
+        // Use Prisma with MongoDB (Force v6 for compatibility)
         if (pkg.dependencies) {
           delete pkg.dependencies['@prisma/adapter-pg'];
           delete pkg.dependencies['pg'];
           delete pkg.dependencies['@types/pg'];
-          pkg.dependencies['@prisma/client'] = PRISMA_VERSION;
+          pkg.dependencies['@prisma/client'] = PRISMA_MONGO_COMPAT;
         }
         if (pkg.devDependencies) {
-          pkg.devDependencies['prisma'] = PRISMA_VERSION;
+          pkg.devDependencies['prisma'] = PRISMA_MONGO_COMPAT;
         }
       } else {
         // Use Mongoose (default for mongo)
@@ -179,13 +179,13 @@ async function patchPackageJson(
         }
       }
     } else {
-      // PostgreSQL: ensure Prisma 6
+      // PostgreSQL: Use latest Prisma
       if (pkg.dependencies) {
-        pkg.dependencies['@prisma/client'] = PRISMA_VERSION;
-        pkg.dependencies['@prisma/adapter-pg'] = PRISMA_VERSION;
+        pkg.dependencies['@prisma/client'] = PRISMA_LATEST;
+        pkg.dependencies['@prisma/adapter-pg'] = PRISMA_LATEST;
       }
       if (pkg.devDependencies) {
-        pkg.devDependencies['prisma'] = PRISMA_VERSION;
+        pkg.devDependencies['prisma'] = PRISMA_LATEST;
       }
     }
 
