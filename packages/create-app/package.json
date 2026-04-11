@@ -1,6 +1,6 @@
 {
   "name": "@tndhuy/create-app",
-  "version": "1.2.7",
+  "version": "1.2.8",
   "private": false,
   "bin": {
     "create-app": "dist/cli.js"
