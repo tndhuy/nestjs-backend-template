@@ -103,9 +103,6 @@ async function bootstrap() {
       });
     }, 15000);
   });
-
-  const logger = app.get(Logger);
-  logger.log(`Application running on http://localhost:${port}`);
 }
 
 void bootstrap();
