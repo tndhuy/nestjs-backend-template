@@ -2,7 +2,7 @@ import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nes
 import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { PUBLIC_API_KEY } from '../decorators/public-api.decorator';
+import { STANDARD_RESPONSE_KEY } from '../decorators/standard-response.decorator';
 
 export const RAW_RESPONSE_KEY = 'raw_response';
 
@@ -20,18 +20,17 @@ export class TransformInterceptor<T> implements NestInterceptor<T, unknown> {
       return next.handle();
     }
 
-    const isPublic = this.reflector.getAllAndOverride<boolean>(PUBLIC_API_KEY, [
+    const useStandard = this.reflector.getAllAndOverride<boolean>(STANDARD_RESPONSE_KEY, [
       context.getHandler(),
       context.getClass(),
     ]);
 
-    // If not explicitly marked as Public API (or similar decorator), return RAW data
-    // This allows internal/system calls to remain untouched while Public APIs are standardized.
-    if (!isPublic) {
+    // Internal first: If not explicitly marked for Standard Response, return RAW data
+    if (!useStandard) {
       return next.handle();
     }
 
-    // Public API: Wrap response in a standardized success object
+    // Standard Response: Wrap response in a standardized success object
     return next.handle().pipe(
       map((data) => {
         // Handle paginated results: { items: [], meta: {} }

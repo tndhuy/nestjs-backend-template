@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { PublicApi } from '../../../common/decorators/public-api.decorator';
+import { StandardResponse } from '../../../common/decorators/standard-response.decorator';
 import { CreateItemDto } from '../application/dtos/create-item.dto';
 import { ItemResponseDto } from '../application/dtos/item.response.dto';
 import { CreateItemCommand } from '../application/commands/create-item.command';
@@ -11,7 +11,7 @@ import { ListItemsQuery } from '../application/queries/list-items.query';
 import { PaginationDto } from '../../../shared';
 
 @ApiTags('example')
-@PublicApi()
+@StandardResponse()
 @Controller('items')
 export class ItemController {
   constructor(
