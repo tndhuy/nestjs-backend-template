@@ -1,5 +1,5 @@
 import { cp, readdir, readFile, writeFile, rename, rm, stat } from 'fs/promises';
-import { join, basename, dirname, resolve } from 'path';
+import { join, basename, dirname, resolve, sep } from 'path';
 import { buildReplacements } from './replacements';
 import { generateKafkaModule } from './kafka-module';
 
@@ -102,8 +102,8 @@ async function renamePathsWithPlaceholders(
 
   // Sort deepest paths first (by number of path separators)
   allPaths.sort((a, b) => {
-    const depthA = a.split('/').length;
-    const depthB = b.split('/').length;
+    const depthA = a.split(sep).length;
+    const depthB = b.split(sep).length;
     return depthB - depthA;
   });
 
@@ -212,7 +212,10 @@ async function pathExists(p: string): Promise<boolean> {
 async function safeDeleteFile(destDir: string, filePath: string): Promise<void> {
   const resolved = resolve(filePath);
   const resolvedDestDir = resolve(destDir);
-  if (!resolved.startsWith(resolvedDestDir + '/') && resolved !== resolvedDestDir) {
+  // Ensure the destination directory ends with a separator for the prefix check
+  const prefix = resolvedDestDir.endsWith(sep) ? resolvedDestDir : resolvedDestDir + sep;
+  
+  if (!resolved.startsWith(prefix) && resolved !== resolvedDestDir) {
     throw new Error(`Security: path '${filePath}' is outside destDir '${destDir}'`);
   }
   try {
@@ -229,7 +232,10 @@ async function safeDeleteFile(destDir: string, filePath: string): Promise<void> 
 async function safeDeleteDir(destDir: string, dirPath: string): Promise<void> {
   const resolved = resolve(dirPath);
   const resolvedDestDir = resolve(destDir);
-  if (!resolved.startsWith(resolvedDestDir + '/') && resolved !== resolvedDestDir) {
+  // Ensure the destination directory ends with a separator for the prefix check
+  const prefix = resolvedDestDir.endsWith(sep) ? resolvedDestDir : resolvedDestDir + sep;
+
+  if (!resolved.startsWith(prefix) && resolved !== resolvedDestDir) {
     throw new Error(`Security: path '${dirPath}' is outside destDir '${destDir}'`);
   }
   try {
