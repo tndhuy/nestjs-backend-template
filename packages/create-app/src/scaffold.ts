@@ -189,6 +189,19 @@ async function patchPackageJson(
     const PRISMA_LATEST = '^7.5.0';
     const PRISMA_MONGO_COMPAT = '^6.0.0';
 
+    if (options.orm === 'prisma') {
+      if (!pkg.scripts) pkg.scripts = {};
+      pkg.scripts['db:generate'] = 'prisma generate';
+      pkg.scripts['db:push'] = 'prisma db push';
+      pkg.scripts['db:pull'] = 'prisma db pull';
+      pkg.scripts['db:studio'] = 'prisma studio';
+      pkg.scripts['db:format'] = 'prisma format';
+      if (options.db === 'postgres') {
+        pkg.scripts['db:migrate:dev'] = 'prisma migrate dev';
+        pkg.scripts['db:migrate:deploy'] = 'prisma migrate deploy';
+      }
+    }
+
     if (options.db === 'mongo') {
       if (options.orm === 'prisma') {
         // Use Prisma with MongoDB (Force v6 for compatibility)
@@ -438,20 +451,35 @@ export async function removeOtel(destDir: string): Promise<void> {
     /^import\s+\w+\s+from\s+['"][^'"]*instrumentation['"];\n?/m,
     // Remove: otelSdk?.start(); line
     /^\s*\w+Sdk\?\.start\(\);\n?/m,
+    // Remove shutdown logic: void otelSdk?.shutdown()...
+    /^\s*void\s+otelSdk\?\.shutdown\(\)\.catch\(\(\)\s*=>\s*undefined\);\n?/m,
   ]);
 
-  // 5. Remove OTel mixin from pino.config.ts
+  // 5. Remove OTel mixin and imports from pino.config.ts
   const pinoConfigPath = join(destDir, 'src', 'shared', 'logger', 'pino.config.ts');
   if (await pathExists(pinoConfigPath)) {
     await removeMatchingLines(pinoConfigPath, [
       // Remove OTel imports
       /^import\s*\{[^}]*trace[^}]*\}\s*from\s*['"]@opentelemetry\/api['"];\n?/m,
-      // Remove mixin block
+      // Remove mixin block (more robust regex for multiline)
       /^\s*mixin\(\)\s*\{[\s\S]*?\n\s*\},\n/m,
     ]);
   }
 
-  // 6. Delete prometheus.yml
+  // 6. Remove OTel from redis.service.ts
+  const redisServicePath = join(destDir, 'src', 'infrastructure', 'cache', 'redis.service.ts');
+  if (await pathExists(redisServicePath)) {
+    await removeMatchingLines(redisServicePath, [
+      /^import\s*\{[^}]*trace[^}]*\}\s*from\s*['"]@opentelemetry\/api['"];\n?/m,
+      // Remove tracing spans from methods
+      /^\s*const\s+span\s*=\s*trace\.getTracer[\s\S]*?span\.end\(\);\n/gm,
+      // Fallback: remove any remaining span.end() or span related lines
+      /^\s*span\.end\(\);\n/gm,
+      /^\s*const\s+span\s*=\s*trace\.getTracer.*\n/gm,
+    ]);
+  }
+
+  // 7. Delete prometheus.yml
   await safeDeleteFile(destDir, join(destDir, 'prometheus.yml'));
 }
 

@@ -87,7 +87,11 @@ async function bootstrap() {
   process.on('SIGTERM', () => {
     loggerService.log('SIGTERM signal received: closing HTTP server');
     setTimeout(() => {
-      void otelSdk?.shutdown().catch(() => undefined);
+      if (process.env.OTEL_ENABLED === 'true') {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const otelSdk = require('./instrumentation').default;
+        void otelSdk?.shutdown().catch(() => undefined);
+      }
       httpServer.close(() => {
         loggerService.log('HTTP server closed');
         process.exit(0);
