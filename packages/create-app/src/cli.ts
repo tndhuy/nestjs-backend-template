@@ -58,6 +58,7 @@ async function main(): Promise<void> {
 
   if (positionalName && !validateServiceName(positionalName)) {
     config.serviceName = positionalName;
+    note(`Using service name: ${config.serviceName} (from arguments)`, 'Info');
   }
 
   let step = config.serviceName ? 1 : 0;
