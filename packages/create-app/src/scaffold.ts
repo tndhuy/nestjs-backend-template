@@ -498,11 +498,13 @@ export async function addKafka(
  * 6. Applies module toggles: removes redis/otel if not selected, adds kafka if selected
  */
 export async function scaffold(options: ScaffoldOptions): Promise<void> {
-  const templateDir = join(__dirname, '..', 'templates', options.db);
+  // Use postgres template as base if ORM is Prisma, otherwise use db-specific template
+  const templateName = options.orm === 'prisma' ? 'postgres' : options.db;
+  const templateDir = join(__dirname, '..', 'templates', templateName);
   const { destDir, serviceName, modules, dryRun } = options;
 
   if (dryRun) {
-    console.log(`\n  [Dry Run] Would copy template from ${options.db} to ${destDir}`);
+    console.log(`\n  [Dry Run] Would copy template from ${templateName} to ${destDir}`);
     console.log(`  [Dry Run] Would replace placeholders for: ${serviceName}`);
     console.log(`  [Dry Run] Would apply modules: ${modules.join(', ') || 'none'}\n`);
     return;
@@ -529,11 +531,30 @@ export async function scaffold(options: ScaffoldOptions): Promise<void> {
     if (await pathExists(schemaPath)) {
       try {
         let content = await readFile(schemaPath, 'utf-8');
+        // Update provider
         content = content.replace(/provider\s*=\s*["']postgresql["']/g, 'provider = "mongodb"');
+        // Update Item model for MongoDB ObjectId compatibility
+        content = content.replace(
+          /id\s+String\s+@id/g,
+          'id String @id @default(auto()) @map("_id") @db.ObjectId'
+        );
         await writeFile(schemaPath, content, 'utf-8');
       } catch (err) {
         console.warn('Warning: Could not update schema.prisma for MongoDB:', err);
       }
+    }
+
+    // Also update .env.example for MongoDB connection string format
+    const envPath = join(destDir, '.env.example');
+    if (await pathExists(envPath)) {
+      try {
+        let content = await readFile(envPath, 'utf-8');
+        content = content.replace(
+          /DATABASE_URL=postgresql:\/\/.*/g,
+          'DATABASE_URL="mongodb+srv://user:password@cluster.mongodb.net/myDatabase?retryWrites=true&w=majority"'
+        );
+        await writeFile(envPath, content, 'utf-8');
+      } catch {}
     }
   }
 
