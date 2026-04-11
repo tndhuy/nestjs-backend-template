@@ -31,6 +31,19 @@ export class TransformInterceptor<T> implements NestInterceptor<T, unknown> {
     }
 
     // Public API: Wrap response in a standardized success object
-    return next.handle().pipe(map((data) => ({ success: true, data })));
+    return next.handle().pipe(
+      map((data) => {
+        // Handle paginated results: { items: [], meta: {} }
+        if (data && typeof data === 'object' && 'items' in data && 'meta' in data) {
+          return {
+            success: true,
+            data: data.items,
+            meta: data.meta,
+          };
+        }
+
+        return { success: true, data };
+      }),
+    );
   }
 }
