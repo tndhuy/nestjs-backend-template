@@ -11,6 +11,7 @@ import { ListItemsQuery } from '../application/queries/list-items.query';
 import { PaginationDto } from '../../../shared';
 
 @ApiTags('example')
+@PublicApi()
 @Controller('items')
 export class ItemController {
   constructor(
@@ -35,7 +36,6 @@ export class ItemController {
     return this.commandBus.execute(new DeleteItemCommand(id));
   }
 
-  @PublicApi()
   @Get(':id')
   @ApiOperation({ summary: 'Get an item by ID' })
   @ApiParam({ name: 'id', description: 'Item UUID' })
@@ -45,7 +45,6 @@ export class ItemController {
     return this.queryBus.execute(new GetItemQuery(id));
   }
 
-  @PublicApi()
   @Get()
   @ApiOperation({ summary: 'List all items with pagination' })
   @ApiResponse({ status: 200, description: 'List of items', type: [ItemResponseDto] })
