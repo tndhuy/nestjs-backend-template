@@ -189,6 +189,9 @@ async function patchPackageJson(
     // but package.json may still have the original if the name field wasn't replaced)
     pkg.name = options.serviceName;
 
+    // Remove workspaces if it exists (it's only for the template monorepo)
+    delete pkg.workspaces;
+
     const PRISMA_LATEST = '^7.5.0';
     const PRISMA_MONGO_COMPAT = '^6.0.0';
 
