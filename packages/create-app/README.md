@@ -1,11 +1,11 @@
-# @team/create-app
+# @tndhuy/create-app
 
-Scaffold a new NestJS DDD backend service from the team template.
+Scaffold a new NestJS DDD backend service from the template.
 
 ## Usage
 
 ```
-npx @team/create-app@latest my-service
+npx @tndhuy/create-app@latest my-service
 ```
 
 ## What it does
@@ -30,7 +30,7 @@ npm run start:dev
 To install from GitHub Packages, add this to your `~/.npmrc`:
 
 ```
-@team:registry=https://npm.pkg.github.com
+@tndhuy:registry=https://npm.pkg.github.com
 //npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN
 ```
 

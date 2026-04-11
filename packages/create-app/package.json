@@ -1,5 +1,5 @@
 {
-  "name": "@team/create-app",
+  "name": "@tndhuy/create-app",
   "version": "0.0.1",
   "private": false,
   "bin": {
@@ -11,6 +11,10 @@
   ],
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tndhuy/nestjs-backend-template.git"
   },
   "scripts": {
     "build": "tsup",
