@@ -8,6 +8,7 @@ import { CacheModule } from './infrastructure/cache/redis.module';
 import { HealthModule } from './infrastructure/health/health.module';
 import { ExampleModule } from './modules/example/example.module';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
+import { LoggerModule } from './shared/logger/logger.module';
 
 @Module({
   imports: [
@@ -16,32 +17,7 @@ import { CorrelationIdMiddleware } from './common/middleware/correlation-id.midd
     CacheModule,
     HealthModule,
     ExampleModule,
-    LoggerModule.forRoot({
-      pinoHttp: {
-        level: process.env.NODE_ENV !== 'production' ? 'debug' : 'info',
-        genReqId: (req) => req.headers['x-correlation-id'] as string,
-        transport:
-          process.env.NODE_ENV !== 'production'
-            ? {
-                target: 'pino-pretty',
-                options: {
-                  colorize: true,
-                  translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
-                  ignore: 'pid,hostname',
-                },
-              }
-            : undefined,
-        serializers: {
-          req: (req: { method: string; url: string }) => ({
-            method: req.method,
-            url: req.url,
-          }),
-          res: (res: { statusCode: number }) => ({
-            statusCode: res.statusCode,
-          }),
-        },
-      },
-    }),
+    LoggerModule,
     ThrottlerModule.forRoot([
       {
         ttl: parseInt(process.env.THROTTLE_TTL ?? '60', 10) * 1000,

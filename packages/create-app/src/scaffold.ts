@@ -402,6 +402,17 @@ export async function removeOtel(destDir: string): Promise<void> {
     // Remove: otelSdk?.start(); line
     /^\s*\w+Sdk\?\.start\(\);\n?/m,
   ]);
+
+  // 5. Remove OTel mixin from pino.config.ts
+  const pinoConfigPath = join(destDir, 'src', 'shared', 'logger', 'pino.config.ts');
+  if (await pathExists(pinoConfigPath)) {
+    await removeMatchingLines(pinoConfigPath, [
+      // Remove OTel imports
+      /^import\s*\{[^}]*trace[^}]*\}\s*from\s*['"]@opentelemetry\/api['"];\n?/m,
+      // Remove mixin block
+      /^\s*mixin\(\)\s*\{[\s\S]*?\n\s*\},\n/m,
+    ]);
+  }
 }
 
 /**
