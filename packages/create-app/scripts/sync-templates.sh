@@ -63,6 +63,11 @@ if [ -f "${REPO_ROOT}/docker-compose.yml" ]; then
   cp "${REPO_ROOT}/docker-compose.yml" "${POSTGRES_DIR}/docker-compose.yml"
 fi
 
+# Copy prometheus.yml
+if [ -f "${REPO_ROOT}/prometheus.yml" ]; then
+  cp "${REPO_ROOT}/prometheus.yml" "${POSTGRES_DIR}/prometheus.yml"
+fi
+
 # Copy eslint config (whichever exists)
 if [ -f "${REPO_ROOT}/eslint.config.mjs" ]; then
   cp "${REPO_ROOT}/eslint.config.mjs" "${POSTGRES_DIR}/eslint.config.mjs"
@@ -103,6 +108,10 @@ GIT_MONGO_BRANCH="mongo-compatible"
 
 echo "    Extracting MongoDB-specific files from ${GIT_MONGO_BRANCH} branch..."
 
+# Copy dynamic templates from root (since they use IF blocks now)
+cp "${REPO_ROOT}/docker-compose.yml" "${MONGO_DIR}/docker-compose.yml"
+cp "${REPO_ROOT}/prometheus.yml" "${MONGO_DIR}/prometheus.yml"
+
 # Function to extract a file from the mongo-compatible branch
 extract_mongo_file() {
   local file_path="$1"
@@ -136,7 +145,6 @@ extract_mongo_file "src/modules/example/example.module.ts"
 extract_mongo_file "src/app.module.ts"
 extract_mongo_file "package.json"
 extract_mongo_file ".env.example"
-extract_mongo_file "docker-compose.yml"
 extract_mongo_file ".gitignore"
 extract_mongo_file "README.md"
 

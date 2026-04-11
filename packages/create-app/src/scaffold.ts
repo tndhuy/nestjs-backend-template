@@ -81,26 +81,35 @@ async function replaceFileContents(
         // 1. Handle conditional blocks
         const isPrisma = options.orm === 'prisma';
         const isMongoose = options.orm === 'mongoose';
+        const hasRedis = options.modules.includes('redis');
+        const hasOtel = options.modules.includes('otel');
+        const hasKafka = options.modules.includes('kafka');
+        const isPostgres = options.db === 'postgres';
+        const isMongo = options.db === 'mongo';
 
-        // PRISMA blocks
-        if (content.includes('{{#IF_PRISMA}}')) {
-          if (isPrisma) {
-            content = content.replaceAll('{{#IF_PRISMA}}', '').replaceAll('{{/IF_PRISMA}}', '');
-          } else {
-            content = content.replace(/{{#IF_PRISMA}}[\s\S]*?{{\/IF_PRISMA}}/g, '');
+        const checkBlock = (content: string, flag: boolean, tag: string): string => {
+          const startTag = `{{#IF_${tag}}}`;
+          const endTag = `{{/IF_${tag}}}`;
+          if (content.includes(startTag)) {
+            if (flag) {
+              return content.replaceAll(startTag, '').replaceAll(endTag, '');
+            } else {
+              const regex = new RegExp(`${startTag}[\\s\\S]*?${endTag}`, 'g');
+              return content.replace(regex, '');
+            }
           }
-          modified = true;
-        }
+          return content;
+        };
 
-        // MONGOOSE blocks
-        if (content.includes('{{#IF_MONGOOSE}}')) {
-          if (isMongoose) {
-            content = content.replaceAll('{{#IF_MONGOOSE}}', '').replaceAll('{{/IF_MONGOOSE}}', '');
-          } else {
-            content = content.replace(/{{#IF_MONGOOSE}}[\s\S]*?{{\/IF_MONGOOSE}}/g, '');
-          }
-          modified = true;
-        }
+        content = checkBlock(content, isPrisma, 'PRISMA');
+        content = checkBlock(content, isMongoose, 'MONGOOSE');
+        content = checkBlock(content, hasRedis, 'REDIS');
+        content = checkBlock(content, hasOtel, 'OTEL');
+        content = checkBlock(content, hasKafka, 'KAFKA');
+        content = checkBlock(content, isPostgres, 'POSTGRES');
+        content = checkBlock(content, isMongo, 'MONGO');
+
+        modified = content !== await readFile(fullPath, 'utf-8');
 
         // 2. Handle standard string replacements
         for (const [from, to] of replacements) {
@@ -441,6 +450,9 @@ export async function removeOtel(destDir: string): Promise<void> {
       /^\s*mixin\(\)\s*\{[\s\S]*?\n\s*\},\n/m,
     ]);
   }
+
+  // 6. Delete prometheus.yml
+  await safeDeleteFile(destDir, join(destDir, 'prometheus.yml'));
 }
 
 /**
