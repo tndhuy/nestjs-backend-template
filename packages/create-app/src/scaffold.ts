@@ -64,24 +64,52 @@ async function collectPaths(dir: string): Promise<string[]> {
 async function replaceFileContents(
   dir: string,
   replacements: [string, string][],
+  options: ScaffoldOptions,
 ): Promise<void> {
   const entries = await readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
     if (entry.isDirectory()) {
-      await replaceFileContents(fullPath, replacements);
+      await replaceFileContents(fullPath, replacements, options);
     } else {
       const binary = await isBinaryFile(fullPath);
       if (binary) continue;
       try {
         let content = await readFile(fullPath, 'utf-8');
         let modified = false;
+
+        // 1. Handle conditional blocks
+        const isPrisma = options.orm === 'prisma';
+        const isMongoose = options.orm === 'mongoose';
+
+        // PRISMA blocks
+        if (content.includes('{{#IF_PRISMA}}')) {
+          if (isPrisma) {
+            content = content.replaceAll('{{#IF_PRISMA}}', '').replaceAll('{{/IF_PRISMA}}', '');
+          } else {
+            content = content.replace(/{{#IF_PRISMA}}[\s\S]*?{{\/IF_PRISMA}}/g, '');
+          }
+          modified = true;
+        }
+
+        // MONGOOSE blocks
+        if (content.includes('{{#IF_MONGOOSE}}')) {
+          if (isMongoose) {
+            content = content.replaceAll('{{#IF_MONGOOSE}}', '').replaceAll('{{/IF_MONGOOSE}}', '');
+          } else {
+            content = content.replace(/{{#IF_MONGOOSE}}[\s\S]*?{{\/IF_MONGOOSE}}/g, '');
+          }
+          modified = true;
+        }
+
+        // 2. Handle standard string replacements
         for (const [from, to] of replacements) {
           if (content.includes(from)) {
             content = content.replaceAll(from, to);
             modified = true;
           }
         }
+
         if (modified) {
           await writeFile(fullPath, content, 'utf-8');
         }
@@ -528,7 +556,7 @@ export async function scaffold(options: ScaffoldOptions): Promise<void> {
   const replacements = buildReplacements(serviceName);
 
   // 3. Replace file contents
-  await replaceFileContents(destDir, replacements);
+  await replaceFileContents(destDir, replacements, options);
 
   // 4. Rename files/dirs with placeholder names (deepest-first)
   await renamePathsWithPlaceholders(destDir, replacements);

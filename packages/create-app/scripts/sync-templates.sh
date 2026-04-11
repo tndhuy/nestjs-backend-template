@@ -43,9 +43,19 @@ cp "${REPO_ROOT}/tsconfig.json" "${POSTGRES_DIR}/tsconfig.json"
 cp "${REPO_ROOT}/tsconfig.build.json" "${POSTGRES_DIR}/tsconfig.build.json"
 cp "${REPO_ROOT}/nest-cli.json" "${POSTGRES_DIR}/nest-cli.json"
 
+# Copy gitignore
+if [ -f "${REPO_ROOT}/.gitignore" ]; then
+  cp "${REPO_ROOT}/.gitignore" "${POSTGRES_DIR}/.gitignore"
+fi
+
 # Copy env example
 if [ -f "${REPO_ROOT}/.env.example" ]; then
   cp "${REPO_ROOT}/.env.example" "${POSTGRES_DIR}/.env.example"
+fi
+
+# Copy README
+if [ -f "${REPO_ROOT}/README.md" ]; then
+  cp "${REPO_ROOT}/README.md" "${POSTGRES_DIR}/README.md"
 fi
 
 # Copy docker-compose
@@ -127,6 +137,8 @@ extract_mongo_file "src/app.module.ts"
 extract_mongo_file "package.json"
 extract_mongo_file ".env.example"
 extract_mongo_file "docker-compose.yml"
+extract_mongo_file ".gitignore"
+extract_mongo_file "README.md"
 
 echo "    MongoDB snapshot ready at: ${MONGO_DIR}"
 

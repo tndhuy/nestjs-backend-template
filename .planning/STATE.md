@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: "**Goal:** Production-ready NestJS DDD template that the team can clone and use immediately, with agent configs pre-wired."
 current_plan: 1
-status: unknown
-stopped_at: Phase 5 context gathered (discuss mode)
-last_updated: "2026-04-07T07:18:46.401Z"
+status: completed
+stopped_at: v1.0.0 Shipped to npm
+last_updated: "2026-04-11T09:15:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 5
@@ -22,20 +22,20 @@ See: `.planning/PROJECT.md` (updated 2026-03-23)
 
 **Core value:** A new backend service should be production-ready in minutes — DDD structure, API standards, observability, and agent configs already in place.
 
-**Current focus:** Phase 05 — cli-package
+**Current focus:** Maintenance & Support (Post-v1.0.0)
 
 ---
 
 ## Current Status
 
 **Milestone:** 1 — NestJS Backend Template v1.0
-**Active Phase:** 4 — agent-configs-documentation
-**Current Plan:** 1
-**Phases complete:** 3/5
-**Progress:** [█████████░] 95%
+**Active Phase:** Completed
+**Current Plan:** -
+**Phases complete:** 5/5
+**Progress:** [██████████] 100%
 
-**Last session:** 2026-04-06T06:40:44.714Z
-**Stopped at:** Phase 5 context gathered (discuss mode)
+**Last session:** 2026-04-11T09:15:00.000Z
+**Stopped at:** v1.0.0 Shipped to npm (create-app@1.0.0)
 
 ---
 

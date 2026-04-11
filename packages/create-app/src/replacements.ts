@@ -16,6 +16,7 @@ export function toPascalCase(kebab: string): string {
 export function buildReplacements(serviceName: string): [string, string][] {
   return [
     ['nestjs-backend-template', serviceName],
+    ['{{SERVICE_NAME_KEBAB}}', serviceName],
     ['NestjsBackendTemplate', toPascalCase(serviceName)],
   ];
 }
