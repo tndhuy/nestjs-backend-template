@@ -52,6 +52,7 @@ async function main(): Promise<void> {
   const config = {
     serviceName: '',
     db: 'postgres' as 'postgres' | 'mongo',
+    orm: 'mongoose' as 'mongoose' | 'prisma',
     modules: [] as string[],
   };
 
@@ -82,8 +83,8 @@ async function main(): Promise<void> {
           await select<'postgres' | 'mongo' | '_back'>({
             message: 'Select database',
             options: [
-              { value: 'postgres', label: 'PostgreSQL', hint: 'default' },
-              { value: 'mongo', label: 'MongoDB' },
+              { value: 'postgres', label: 'PostgreSQL', hint: 'using Prisma' },
+              { value: 'mongo', label: 'MongoDB', hint: 'choice of Mongoose or Prisma' },
               { value: '_back', label: 'Go Back', hint: 'return to service name' },
             ],
           }),
@@ -93,6 +94,19 @@ async function main(): Promise<void> {
           step--;
         } else {
           config.db = res;
+          if (res === 'mongo') {
+            config.orm = guardCancel(
+              await select<'mongoose' | 'prisma'>({
+                message: 'Select MongoDB ORM',
+                options: [
+                  { value: 'mongoose', label: 'Mongoose', hint: 'default for NestJS' },
+                  { value: 'prisma', label: 'Prisma', hint: 'v6 compatible mode' },
+                ],
+              }),
+            );
+          } else {
+            config.orm = 'prisma'; // PostgreSQL always uses Prisma in this template
+          }
           step++;
         }
         break;
@@ -129,6 +143,7 @@ async function main(): Promise<void> {
         note(
           `Service name : ${config.serviceName}\n` +
           `Database     : ${config.db}\n` +
+          `ORM          : ${config.orm}\n` +
           `Modules      : ${selectedModules}`,
           'Confirm Project Summary'
         );
@@ -145,7 +160,6 @@ async function main(): Promise<void> {
         );
 
         if (res === 'confirm') {
-          // Check if directory exists before proceeding
           const destDir = join(process.cwd(), config.serviceName);
           if (await directoryExists(destDir) && !dryRun) {
             const overwrite = guardCancel(
@@ -197,6 +211,7 @@ async function main(): Promise<void> {
     await scaffold({
       serviceName: config.serviceName,
       db: config.db,
+      orm: config.orm,
       modules: config.modules,
       destDir,
       dryRun,
@@ -208,7 +223,6 @@ async function main(): Promise<void> {
   }
 
   if (!dryRun) {
-    // Post-scaffold: Git Init
     const initGit = guardCancel(await confirm({ message: 'Initialize git repository?', initialValue: true }));
     if (initGit) {
       const gs = spinner();
@@ -223,7 +237,6 @@ async function main(): Promise<void> {
       }
     }
 
-    // Post-scaffold: Install Dependencies
     const installDeps = guardCancel(await confirm({ message: 'Install dependencies now?', initialValue: true }));
     if (installDeps) {
       const pkgManager = guardCancel(await select({
@@ -246,7 +259,6 @@ async function main(): Promise<void> {
     }
   }
 
-  // Next steps
   outro(
     `Next steps:\n\n  cd ${config.serviceName}\n${dryRun ? '' : '  npm run start:dev\n'}`
   );

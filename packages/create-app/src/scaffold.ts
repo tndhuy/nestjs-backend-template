@@ -6,6 +6,7 @@ import { generateKafkaModule } from './kafka-module';
 export interface ScaffoldOptions {
   serviceName: string;
   db: 'postgres' | 'mongo';
+  orm?: 'mongoose' | 'prisma';
   modules: string[]; // 'redis' | 'otel' | 'kafka'
   destDir: string;
   dryRun?: boolean;
@@ -148,18 +149,43 @@ async function patchPackageJson(
     // but package.json may still have the original if the name field wasn't replaced)
     pkg.name = options.serviceName;
 
+    // Default to prisma version 6 for compatibility
+    const PRISMA_VERSION = '^6.0.0';
+
     if (options.db === 'mongo') {
-      // Remove Prisma, add Mongoose
+      if (options.orm === 'prisma') {
+        // Use Prisma with MongoDB
+        if (pkg.dependencies) {
+          delete pkg.dependencies['@prisma/adapter-pg'];
+          delete pkg.dependencies['pg'];
+          delete pkg.dependencies['@types/pg'];
+          pkg.dependencies['@prisma/client'] = PRISMA_VERSION;
+        }
+        if (pkg.devDependencies) {
+          pkg.devDependencies['prisma'] = PRISMA_VERSION;
+        }
+      } else {
+        // Use Mongoose (default for mongo)
+        if (pkg.dependencies) {
+          delete pkg.dependencies['@prisma/client'];
+          delete pkg.dependencies['@prisma/adapter-pg'];
+          delete pkg.dependencies['pg'];
+          delete pkg.dependencies['@types/pg'];
+          pkg.dependencies['mongoose'] = '^8.0.0';
+          pkg.dependencies['@nestjs/mongoose'] = '^11.0.0';
+        }
+        if (pkg.devDependencies) {
+          delete pkg.devDependencies['prisma'];
+        }
+      }
+    } else {
+      // PostgreSQL: ensure Prisma 6
       if (pkg.dependencies) {
-        delete pkg.dependencies['@prisma/client'];
-        delete pkg.dependencies['@prisma/adapter-pg'];
-        delete pkg.dependencies['pg'];
-        delete pkg.dependencies['@types/pg'];
-        pkg.dependencies['mongoose'] = '^8.0.0';
-        pkg.dependencies['@nestjs/mongoose'] = '^11.0.0';
+        pkg.dependencies['@prisma/client'] = PRISMA_VERSION;
+        pkg.dependencies['@prisma/adapter-pg'] = PRISMA_VERSION;
       }
       if (pkg.devDependencies) {
-        delete pkg.devDependencies['prisma'];
+        pkg.devDependencies['prisma'] = PRISMA_VERSION;
       }
     }
 
@@ -496,6 +522,20 @@ export async function scaffold(options: ScaffoldOptions): Promise<void> {
 
   // 5. Patch package.json (handles db swap + module dep additions/removals)
   await patchPackageJson(destDir, options);
+
+  // 5.1 Special handling for Prisma + MongoDB
+  if (options.db === 'mongo' && options.orm === 'prisma') {
+    const schemaPath = join(destDir, 'prisma', 'schema.prisma');
+    if (await pathExists(schemaPath)) {
+      try {
+        let content = await readFile(schemaPath, 'utf-8');
+        content = content.replace(/provider\s*=\s*["']postgresql["']/g, 'provider = "mongodb"');
+        await writeFile(schemaPath, content, 'utf-8');
+      } catch (err) {
+        console.warn('Warning: Could not update schema.prisma for MongoDB:', err);
+      }
+    }
+  }
 
   // 6. Apply module toggles
   if (!modules.includes('redis')) {
