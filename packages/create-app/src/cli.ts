@@ -254,6 +254,18 @@ async function main(): Promise<void> {
       try {
         await execa(pkgManager, ['install'], { cwd: destDir, stdio: 'inherit' });
         is.stop('Dependencies installed successfully.');
+
+        // Automatic Prisma Generate if ORM is Prisma
+        if (config.orm === 'prisma') {
+          const ps = spinner();
+          ps.start('Generating Prisma Client...');
+          try {
+            await execa(pkgManager, ['run', 'db:generate'], { cwd: destDir });
+            ps.stop('Prisma Client generated successfully.');
+          } catch (err) {
+            ps.stop('Prisma Client generation failed. You may need to run it manually.');
+          }
+        }
       } catch (err) {
         is.stop('Dependency installation failed.');
       }
