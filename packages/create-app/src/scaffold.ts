@@ -90,17 +90,31 @@ async function replaceFileContents(
         const checkBlock = (content: string, flag: boolean, tag: string): string => {
           const startTag = `{{#IF_${tag}}}`;
           const endTag = `{{/IF_${tag}}}`;
+          const startNotTag = `{{#IF_NOT_${tag}}}`;
+          const endNotTag = `{{/IF_NOT_${tag}}}`;
+
           if (content.includes(startTag)) {
             if (flag) {
-              return content.replaceAll(startTag, '').replaceAll(endTag, '');
+              content = content.replaceAll(startTag, '').replaceAll(endTag, '');
             } else {
-              // Escape braces for Regex: {{ becomes \{\{
               const escapedStart = startTag.replace(/\{/g, '\\{').replace(/\}/g, '\\}');
               const escapedEnd = endTag.replace(/\{/g, '\\{').replace(/\}/g, '\\}');
               const regex = new RegExp(`${escapedStart}[\\s\\S]*?${escapedEnd}`, 'g');
-              return content.replace(regex, '');
+              content = content.replace(regex, '');
             }
           }
+
+          if (content.includes(startNotTag)) {
+            if (!flag) {
+              content = content.replaceAll(startNotTag, '').replaceAll(endNotTag, '');
+            } else {
+              const escapedStart = startNotTag.replace(/\{/g, '\\{').replace(/\}/g, '\\}');
+              const escapedEnd = endNotTag.replace(/\{/g, '\\{').replace(/\}/g, '\\}');
+              const regex = new RegExp(`${escapedStart}[\\s\\S]*?${escapedEnd}`, 'g');
+              content = content.replace(regex, '');
+            }
+          }
+
           return content;
         };
 
@@ -461,31 +475,10 @@ export async function removeOtel(destDir: string): Promise<void> {
     /^\s*void\s+otelSdk\?\.shutdown\(\)\.catch\(\(\)\s*=>\s*undefined\);\n?/m,
   ]);
 
-  // 5. Remove OTel mixin and imports from pino.config.ts
-  const pinoConfigPath = join(destDir, 'src', 'shared', 'logger', 'pino.config.ts');
-  if (await pathExists(pinoConfigPath)) {
-    await removeMatchingLines(pinoConfigPath, [
-      // Remove OTel imports
-      /^import\s*\{[^}]*trace[^}]*\}\s*from\s*['"]@opentelemetry\/api['"];\n?/m,
-      // Remove mixin block (more robust regex for multiline)
-      /^\s*mixin\(\)\s*\{[\s\S]*?\n\s*\},\n/m,
-    ]);
-  }
+  // 5. OTel related code in pino.config.ts and redis.service.ts is now handled via {{#IF_OTEL}} blocks
+  // so no manual line removal is needed there.
 
-  // 6. Remove OTel from redis.service.ts
-  const redisServicePath = join(destDir, 'src', 'infrastructure', 'cache', 'redis.service.ts');
-  if (await pathExists(redisServicePath)) {
-    await removeMatchingLines(redisServicePath, [
-      /^import\s*\{[^}]*trace[^}]*\}\s*from\s*['"]@opentelemetry\/api['"];\n?/m,
-      // Remove tracing spans from methods
-      /^\s*const\s+span\s*=\s*trace\.getTracer[\s\S]*?span\.end\(\);\n/gm,
-      // Fallback: remove any remaining span.end() or span related lines
-      /^\s*span\.end\(\);\n/gm,
-      /^\s*const\s+span\s*=\s*trace\.getTracer.*\n/gm,
-    ]);
-  }
-
-  // 7. Delete prometheus.yml
+  // 6. Delete prometheus.yml
   await safeDeleteFile(destDir, join(destDir, 'prometheus.yml'));
 }
 
@@ -654,5 +647,11 @@ export async function scaffold(options: ScaffoldOptions): Promise<void> {
 
   if (modules.includes('kafka')) {
     await addKafka(destDir, serviceName);
+  }
+
+  // 7. Ensure .gitignore is present (renamed from gitignore.template)
+  const templateGitignore = join(destDir, 'gitignore.template');
+  if (await pathExists(templateGitignore)) {
+    await rename(templateGitignore, join(destDir, '.gitignore'));
   }
 }

@@ -84,6 +84,11 @@ async function bootstrap() {
   const port = parseInt(process.env.PORT ?? '3000', 10);
   const httpServer = await app.listen(port);
 
+  const logger = app.get(Logger);
+  logger.log(`🚀 Application is running on: http://localhost:${port}`);
+  logger.log(`📖 API Documentation (Scalar): http://localhost:${port}/docs`);
+  logger.log(`📄 API Spec (JSON): http://localhost:${port}/docs/json`);
+
   process.on('SIGTERM', () => {
     loggerService.log('SIGTERM signal received: closing HTTP server');
     setTimeout(() => {

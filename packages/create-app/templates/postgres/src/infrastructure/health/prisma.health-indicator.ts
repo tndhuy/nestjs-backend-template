@@ -10,7 +10,13 @@ export class PrismaHealthIndicator extends HealthIndicator {
 
   async isHealthy(key: string): Promise<HealthIndicatorResult> {
     try {
+{{#IF_POSTGRES}}
       await this.prisma.$queryRaw`SELECT 1`;
+{{/IF_POSTGRES}}
+{{#IF_MONGO}}
+      // Prisma on MongoDB uses $runCommandRaw for ping or simple check
+      await this.prisma.$runCommandRaw({ ping: 1 });
+{{/IF_MONGO}}
       return this.getStatus(key, true);
     } catch (error) {
       throw new HealthCheckError('Database check failed', this.getStatus(key, false));

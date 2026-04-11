@@ -239,8 +239,9 @@ async function main(): Promise<void> {
     }
 
     const installDeps = guardCancel(await confirm({ message: 'Install dependencies now?', initialValue: true }));
+    let pkgManager = 'npm';
     if (installDeps) {
-      const pkgManager = guardCancel(await select({
+      pkgManager = guardCancel(await select({
         message: 'Select package manager',
         options: [
           { value: 'pnpm', label: 'pnpm', hint: 'recommended' },
@@ -270,11 +271,11 @@ async function main(): Promise<void> {
         is.stop('Dependency installation failed.');
       }
     }
-  }
 
-  outro(
-    `Next steps:\n\n  cd ${config.serviceName}\n${dryRun ? '' : '  npm run start:dev\n'}`
-  );
+    outro(
+      `Next steps:\n\n  cd ${config.serviceName}\n${dryRun ? '' : `  ${pkgManager} run start:dev\n`}`
+    );
+  }
 }
 
 main().catch((err) => {

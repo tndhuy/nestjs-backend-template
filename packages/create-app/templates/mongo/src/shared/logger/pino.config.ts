@@ -1,6 +1,8 @@
 import { join } from 'path';
 import type { Params } from 'nestjs-pino';
+{{#IF_OTEL}}
 import { trace, context, isSpanContextValid } from '@opentelemetry/api';
+{{/IF_OTEL}}
 
 const isDev = process.env.NODE_ENV !== 'production';
 const LOG_DIR = join(process.cwd(), 'logs');
@@ -11,6 +13,7 @@ export const pinoConfig: Params = {
     level: isDev ? 'debug' : 'info',
     // Inject Trace context into every log line
     mixin() {
+{{#IF_OTEL}}
       const activeSpan = trace.getSpan(context.active());
       if (activeSpan) {
         const spanContext = activeSpan.spanContext();
@@ -22,6 +25,7 @@ export const pinoConfig: Params = {
           };
         }
       }
+{{/IF_OTEL}}
       return {};
     },
     // Standardize on X-Request-Id as the primary req.id
