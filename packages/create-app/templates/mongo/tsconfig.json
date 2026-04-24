@@ -19,5 +19,5 @@
     "strictNullChecks": true,
     "noImplicitAny": false
   },
-  "exclude": ["node_modules", "dist", "test", "packages"]
+  "exclude": ["node_modules", "dist", "test"]
 }

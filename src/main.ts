@@ -84,25 +84,19 @@ async function bootstrap() {
   const port = parseInt(process.env.PORT ?? '3000', 10);
   const httpServer = await app.listen(port);
 
-  const logger = app.get(Logger);
-  logger.log(`Application is running on: http://localhost:${port}`);
-  logger.log(`API Documentation (Scalar): http://localhost:${port}/docs`);
-  logger.log(`API Spec (JSON): http://localhost:${port}/docs/json`);
-
   process.on('SIGTERM', () => {
     loggerService.log('SIGTERM signal received: closing HTTP server');
     setTimeout(() => {
-      if (process.env.OTEL_ENABLED === 'true') {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const otelSdk = require('./instrumentation').default;
-        void otelSdk?.shutdown().catch(() => undefined);
-      }
+      void otelSdk?.shutdown().catch(() => undefined);
       httpServer.close(() => {
         loggerService.log('HTTP server closed');
         process.exit(0);
       });
     }, 15000);
   });
+
+  const logger = app.get(Logger);
+  logger.log(`Application running on http://localhost:${port}`);
 }
 
 void bootstrap();

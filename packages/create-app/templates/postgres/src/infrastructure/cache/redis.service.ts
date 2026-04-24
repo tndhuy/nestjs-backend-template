@@ -1,11 +1,9 @@
 import { Injectable, OnModuleDestroy, Logger } from '@nestjs/common';
 import Redis from 'ioredis';
 import { circuitBreaker, ConsecutiveBreaker, CircuitBreakerPolicy, handleAll } from 'cockatiel';
-{{#IF_OTEL}}
 import { trace } from '@opentelemetry/api';
 
 const tracer = trace.getTracer('redis-service');
-{{/IF_OTEL}}
 
 @Injectable()
 export class RedisService implements OnModuleDestroy {
@@ -48,7 +46,6 @@ export class RedisService implements OnModuleDestroy {
   }
 
   async get(key: string): Promise<string | null> {
-{{#IF_OTEL}}
     return tracer.startActiveSpan('redis.get', async (span) => {
       try {
         span.setAttribute('db.system', 'redis');
@@ -62,14 +59,9 @@ export class RedisService implements OnModuleDestroy {
         span.end();
       }
     });
-{{/IF_OTEL}}
-{{#IF_NOT_OTEL}}
-    return this.execute((c) => c.get(key));
-{{/IF_NOT_OTEL}}
   }
 
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
-{{#IF_OTEL}}
     return tracer.startActiveSpan('redis.set', async (span) => {
       try {
         span.setAttribute('db.system', 'redis');
@@ -92,20 +84,9 @@ export class RedisService implements OnModuleDestroy {
         span.end();
       }
     });
-{{/IF_OTEL}}
-{{#IF_NOT_OTEL}}
-    await this.execute(async (c) => {
-      if (ttlSeconds) {
-        await c.set(key, value, 'EX', ttlSeconds);
-      } else {
-        await c.set(key, value);
-      }
-    });
-{{/IF_NOT_OTEL}}
   }
 
   async del(key: string): Promise<void> {
-{{#IF_OTEL}}
     return tracer.startActiveSpan('redis.del', async (span) => {
       try {
         span.setAttribute('db.system', 'redis');
@@ -119,14 +100,9 @@ export class RedisService implements OnModuleDestroy {
         span.end();
       }
     });
-{{/IF_OTEL}}
-{{#IF_NOT_OTEL}}
-    await this.execute((c) => c.del(key).then(() => undefined));
-{{/IF_NOT_OTEL}}
   }
 
   async expire(key: string, ttlSeconds: number): Promise<void> {
-{{#IF_OTEL}}
     return tracer.startActiveSpan('redis.expire', async (span) => {
       try {
         span.setAttribute('db.system', 'redis');
@@ -141,9 +117,5 @@ export class RedisService implements OnModuleDestroy {
         span.end();
       }
     });
-{{/IF_OTEL}}
-{{#IF_NOT_OTEL}}
-    await this.execute((c) => c.expire(key, ttlSeconds).then(() => undefined));
-{{/IF_NOT_OTEL}}
   }
 }
