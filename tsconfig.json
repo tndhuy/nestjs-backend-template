@@ -11,6 +11,7 @@
     "sourceMap": true,
     "outDir": "./dist",
     "baseUrl": "./",
+    "rootDir": "src",
     "paths": {
       "@shared/*": ["src/shared/*"]
     },
@@ -19,5 +20,6 @@
     "strictNullChecks": true,
     "noImplicitAny": false
   },
-  "exclude": ["node_modules", "dist", "test", "packages"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "test", "packages", "packages/create-app/templates"]
 }

@@ -35,7 +35,7 @@ async function main(): Promise<void> {
     await text({
       message: 'Service name (kebab-case)',
       placeholder: 'my-service',
-      validate: (v) => validateServiceName(v),
+      validate: (v) => validateServiceName(v as string),
     }),
   );
 

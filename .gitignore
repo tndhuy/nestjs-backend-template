@@ -36,12 +36,10 @@ lerna-debug.log*
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# Environment files
-.env
-.env.development.local
-.env.test.local
-.env.production.local
-.env.local
+# dotenv environment variable files
+.env*
+!.env.example
+.env.keys
 
 # TypeScript incremental compilation
 *.tsbuildinfo
